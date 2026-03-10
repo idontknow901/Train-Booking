@@ -12,7 +12,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const cleanHash = (str) => str.replace(/^['"]|['"]$/g, '').replace(/\$\$/g, '$');
+const cleanHash = (str) => {
+    const trimmed = str.replace(/^['"]|['"]$/g, '').trim();
+    if (trimmed.startsWith('$')) return trimmed;
+    try {
+        return Buffer.from(trimmed, 'base64').toString();
+    } catch (e) {
+        return trimmed;
+    }
+};
 const ADMIN_HASH = cleanHash((process.env.ADMIN_PASSWORD_HASH || '').trim());
 console.log('🔐 ADMIN_HASH set?', !!ADMIN_HASH && ADMIN_HASH.length > 10);
 

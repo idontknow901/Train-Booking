@@ -18,9 +18,15 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
     const [loading, setLoading] = useState(false);
 
     const cleanHash = (str: string) => {
-        return str
-            .replace(/^['"]|['"]$/g, '') // Remove surrounding quotes
-            .replace(/\$\$/g, '$');      // Unescape double dollar signs if necessary
+        const trimmed = str.replace(/^['"]|['"]$/g, '').trim();
+        // If it starts with $, it's a direct hash.
+        // If not, it's likely our Base64 encoded safe version.
+        if (trimmed.startsWith('$')) return trimmed;
+        try {
+            return atob(trimmed);
+        } catch (e) {
+            return trimmed;
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

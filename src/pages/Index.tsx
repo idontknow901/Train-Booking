@@ -29,19 +29,12 @@ const Index = () => {
   }, [trains, stations]);
 
   const handleSearch = (origin: string, destination: string, date: string) => {
-    setIsSearching(true);
     setSearchParams({ origin, destination, date });
-
-    // Slight delay to show search state (looks more "premium")
-    setTimeout(() => {
-      const filtered = getTrainsByRoute(origin, destination, date);
-      setResults(filtered);
-      setIsSearching(false);
-
-      if (filtered.length === 0) {
-        toast.info('No trains found for this route and date.');
-      }
-    }, 400);
+    const filtered = getTrainsByRoute(origin, destination, date);
+    setResults(filtered);
+    if (filtered.length === 0) {
+      toast.info('No trains found for this route and date.');
+    }
   };
 
   const handleSelectTrain = (train: Train) => {
@@ -109,28 +102,19 @@ const Index = () => {
               <div className="space-y-12">
                 <TrainSearch onSearch={handleSearch} />
 
-                {isSearching ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-4">
-                    <div className="h-8 w-8 border-4 border-accent/20 border-t-accent rounded-full animate-spin" />
-                    <p className="text-muted-foreground font-medium animate-pulse">Scanning live rail network...</p>
-                  </div>
-                ) : (
-                  <>
-                    {results.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-6"
-                      >
-                        <div className="flex items-center gap-4 px-2">
-                          <div className="h-px flex-1 bg-border" />
-                          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Available Routes</h3>
-                          <div className="h-px flex-1 bg-border" />
-                        </div>
-                        <TrainList trains={results} onSelectTrain={handleSelectTrain} />
-                      </motion.div>
-                    )}
-                  </>
+                {results.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="flex items-center gap-4 px-2">
+                      <div className="h-px flex-1 bg-border" />
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Available Routes</h3>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                    <TrainList trains={results} onSelectTrain={handleSelectTrain} />
+                  </motion.div>
                 )}
               </div>
             )}

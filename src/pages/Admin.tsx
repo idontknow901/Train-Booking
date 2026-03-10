@@ -93,12 +93,11 @@ export default function Admin() {
             <Switch
               checked={settings.bookingOpen}
               onCheckedChange={async () => {
-                const toastId = toast.loading('Updating settings...');
                 try {
                   await toggleBooking();
-                  toast.success(`Reservations are now ${!settings.bookingOpen ? 'OPEN' : 'CLOSED'}`, { id: toastId });
+                  toast.success(`Reservations are now ${!settings.bookingOpen ? 'OPEN' : 'CLOSED'}`);
                 } catch (e) {
-                  toast.error('Failed to update settings', { id: toastId });
+                  toast.error('Failed to update settings');
                 }
               }}
             />
@@ -113,12 +112,11 @@ export default function Admin() {
             className="rounded-2xl font-bold shadow-lg shadow-destructive/20 hover:shadow-destructive/30 transition-all active:scale-95"
             onClick={async () => {
               if (!confirm('This will RESET all seats on all trains and DELETE all booking records. Continue?')) return;
-              const toastId = toast.loading('Resetting all seats...');
               try {
                 await resetAllSeats();
-                toast.success('All seats have been reset', { id: toastId });
+                toast.success('All seats have been reset');
               } catch (e) {
-                toast.error('Reset failed. Check console.', { id: toastId });
+                toast.error('Reset failed. Check console.');
               }
             }}
           >
@@ -131,14 +129,13 @@ export default function Admin() {
             className="rounded-2xl font-bold border-destructive/30 text-destructive hover:bg-destructive/10 transition-all active:scale-95"
             onClick={async () => {
               if (!confirm('CRITICAL: This will DELETE EVERYTHING (Trains, Stations, Bookings). Are you absolutely sure?')) return;
-              const toastId = toast.loading('Performing Global Reset...');
               try {
                 await clearAllBookings();
                 await clearAllTrains();
                 await clearAllStations();
-                toast.success('System wiped successfully', { id: toastId });
+                toast.success('System wiped successfully');
               } catch (e) {
-                toast.error('Global Reset failed', { id: toastId });
+                toast.error('Global Reset failed');
               }
             }}
           >
@@ -195,12 +192,11 @@ function PassengerList({ bookings, onClearAll }: { bookings: Booking[], onClearA
           size="sm"
           onClick={async () => {
             if (!confirm('Clear all booking records?')) return;
-            const tId = toast.loading('Clearing bookings...');
             try {
               await onClearAll();
-              toast.success('Bookings cleared successfully', { id: tId });
+              toast.success('Bookings cleared');
             } catch (e) {
-              toast.error('Failed to clear bookings', { id: tId });
+              toast.error('Failed to clear bookings');
             }
           }}
           className="text-destructive hover:bg-destructive/10 font-bold"
@@ -251,12 +247,11 @@ function TrainList({ trains, onRemove, onClearAll }: { trains: Train[], onRemove
             size="sm"
             onClick={async () => {
               if (!confirm('Remove all trains from the database?')) return;
-              const tId = toast.loading('Wiping train records...');
               try {
                 await onClearAll();
-                toast.success('All trains removed successfully', { id: tId });
+                toast.success('All trains removed');
               } catch (e) {
-                toast.error('Failed to remove trains', { id: tId });
+                toast.error('Failed to remove trains');
               }
             }}
             className="text-destructive hover:bg-destructive/10 font-bold"
@@ -289,12 +284,11 @@ function TrainList({ trains, onRemove, onClearAll }: { trains: Train[], onRemove
                 variant="ghost"
                 size="icon"
                 onClick={async () => {
-                  const toastId = toast.loading(`Removing ${train.name}...`);
                   try {
                     await onRemove(train.id);
-                    toast.success(`${train.name} removed successfully`, { id: toastId });
+                    toast.success(`${train.name} removed`);
                   } catch (e) {
-                    toast.error(`Failed to remove ${train.name}`, { id: toastId });
+                    toast.error(`Failed to remove ${train.name}`);
                   }
                 }}
                 className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
@@ -328,7 +322,6 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
     const destStation = stations.find(s => s.code === destination)!;
 
     setIsSubmitting(true);
-    const toastId = toast.loading(`Adding ${name} to fleet...`);
 
     const train: Train = {
       id: `train-${Date.now()}`,
@@ -353,11 +346,11 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
 
     try {
       await onAdd(train);
-      toast.success(`Train "${name}" added successfully`, { id: toastId });
+      toast.success(`Train "${name}" added!`);
       setName(''); setNumber(''); setOrigin(''); setDestination(''); setDate('');
       setCoaches([{ type: 'SL', seats: 72 }]);
     } catch (e) {
-      toast.error('Failed to add train', { id: toastId });
+      toast.error('Failed to add train. Check Firestore permissions.');
     } finally {
       setIsSubmitting(false);
     }
@@ -459,18 +452,17 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
 
   const handleAdd = async () => {
     if (!name || !code) {
-      toast.error('Please enter name and code');
+      toast.error('Please enter both station name and code');
       return;
     }
     setIsSubmitting(true);
-    const toastId = toast.loading(`Creating station ${name}...`);
     try {
       await onAdd({ name, code: code.toUpperCase() });
       setName('');
       setCode('');
-      toast.success('Station added successfully', { id: toastId });
+      toast.success(`Station "${name}" added!`);
     } catch (e) {
-      toast.error('Failed to add station', { id: toastId });
+      toast.error('Failed to add station. Check Firestore permissions.');
     } finally {
       setIsSubmitting(false);
     }
@@ -489,9 +481,12 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
               size="sm"
               onClick={async () => {
                 if (!confirm('Delete all stations? This may break existing train routes.')) return;
-                const tId = toast.loading('Clearing stations...');
-                await onClearAll();
-                toast.success('Stations cleared', { id: tId });
+                try {
+                  await onClearAll();
+                  toast.success('All stations cleared');
+                } catch (e) {
+                  toast.error('Failed to clear stations');
+                }
               }}
               className="text-destructive hover:bg-destructive/10 font-bold"
             >
@@ -515,9 +510,12 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
                 variant="ghost"
                 size="icon"
                 onClick={async () => {
-                  const toastId = toast.loading(`Removing ${s.name}...`);
-                  await onRemove(s.code);
-                  toast.success(`${s.name} removed`, { id: toastId });
+                  try {
+                    await onRemove(s.code);
+                    toast.success(`${s.name} removed`);
+                  } catch (e) {
+                    toast.error(`Failed to remove ${s.name}`);
+                  }
                 }}
                 className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
               >

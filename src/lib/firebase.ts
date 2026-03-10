@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, onSnapshotsInSync } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache, onSnapshotsInSync } from 'firebase/firestore';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -11,8 +11,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// Disable local persistence to prevent "stuck" writes in IndexedDB
 export const db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
+    localCache: memoryLocalCache()
 });
 
 // Monitor sync status

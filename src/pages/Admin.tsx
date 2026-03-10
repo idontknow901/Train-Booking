@@ -341,18 +341,19 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
     };
 
     try {
-      await onAdd(train);
-      toast.success(`Train "${name}" added!`);
-      // Reset form
+      // Reset form immediately
       setName('');
       setNumber('');
       setOrigin('');
       setDestination('');
       setDate('');
       setCoaches([{ type: 'SL', seats: 72 }]);
-    } catch (e) {
+
+      await onAdd(train);
+      toast.success(`Train "${train.name}" added!`);
+    } catch (e: any) {
       console.error('Failed to add train:', e);
-      toast.error('Failed to add train. Check console for details.');
+      toast.error(e.message || 'Failed to add train.');
     } finally {
       setIsSubmitting(false);
     }
@@ -460,14 +461,16 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
     setIsSubmitting(true);
     try {
       const station = { name, code: code.toUpperCase() };
-      await onAdd(station);
-      toast.success(`Station "${name}" added!`);
-      // Reset fields immediately on success
+
+      // Reset fields immediately so user can add another station without waiting
       setName('');
       setCode('');
+
+      await onAdd(station);
+      toast.success(`Station "${station.name}" added!`);
     } catch (e: any) {
       console.error('Failed to add station:', e);
-      toast.error(e.message || 'Failed to add station. Check connection.');
+      toast.error(e.message || 'Failed to add station.');
     } finally {
       setIsSubmitting(false);
     }

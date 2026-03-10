@@ -211,7 +211,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         batch.delete(bookingDoc.ref);
       });
 
-      await batch.commit();
+      await withTimeout(batch.commit(), 'Resetting database');
       console.log('Successfully reset all seats and bookings');
     } catch (error) {
       console.error('Error resetting seats:', error);
@@ -224,7 +224,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       const querySnapshot = await getDocs(collection(db, 'trains'));
       const batch = writeBatch(db);
       querySnapshot.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
+      await withTimeout(batch.commit(), 'Wiping trains');
     } catch (e) { console.error(e); throw e; }
   }, []);
 
@@ -233,7 +233,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       const querySnapshot = await getDocs(collection(db, 'stations'));
       const batch = writeBatch(db);
       querySnapshot.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
+      await withTimeout(batch.commit(), 'Wiping stations');
     } catch (e) { console.error(e); throw e; }
   }, []);
 
@@ -242,12 +242,12 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       const querySnapshot = await getDocs(collection(db, 'bookings'));
       const batch = writeBatch(db);
       querySnapshot.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
+      await withTimeout(batch.commit(), 'Wiping bookings');
     } catch (e) { console.error(e); throw e; }
   }, []);
 
   const toggleBooking = useCallback(async () => {
-    await updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen });
+    await withTimeout(updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen }), 'Toggling reservations');
   }, [settings.bookingOpen]);
 
   const getTrainsByRoute = useCallback((origin: string, destination: string, date?: string) => {

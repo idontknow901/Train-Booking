@@ -12,8 +12,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const ADMIN_HASH = (process.env.ADMIN_PASSWORD_HASH || '').trim();
-console.log('🔐 ADMIN_HASH set?', !!ADMIN_HASH);
+const stripQuotes = (str) => str.replace(/^['"]|['"]$/g, '');
+const ADMIN_HASH = stripQuotes((process.env.ADMIN_PASSWORD_HASH || '').trim());
+console.log('🔐 ADMIN_HASH set?', !!ADMIN_HASH && ADMIN_HASH.length > 10);
 
 // Serve static files from the dist directory (if built)
 app.use(express.static(path.join(__dirname, '../dist')));
@@ -55,7 +56,7 @@ app.post('/api/admin/verify', async (req, res) => {
 });
 
 // Catch-all route for SPA fallback (serves index.html for unknown routes)
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
     // If it's an API route or file that doesn't exist, ignore (or handle accordingly)
     if (req.path.startsWith('/api/')) {
         return res.status(404).json({ error: 'API endpoint not found' });

@@ -17,25 +17,30 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    const stripQuotes = (str: string) => str.replace(/^['"]|['"]$/g, '');
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            const ADMIN_HASH = import.meta.env.VITE_ADMIN_PASSWORD_HASH || '';
-            console.log('Login attempt: checking hash format...', {
+            const rawHash = import.meta.env.VITE_ADMIN_PASSWORD_HASH || '';
+            const ADMIN_HASH = stripQuotes(rawHash.trim());
+
+            console.log('Login attempt debug:', {
                 hasHash: !!ADMIN_HASH,
-                length: ADMIN_HASH.length,
-                prefix: ADMIN_HASH.substring(0, 10)
+                hashLength: ADMIN_HASH.length,
+                hashPrefix: ADMIN_HASH.substring(0, 7), // Should be $2b$10$
+                hashSuffix: ADMIN_HASH.slice(-5)
             });
 
-            if (!ADMIN_HASH) {
-                toast.error('Admin password hash missing in .env file.');
+            if (!ADMIN_HASH || ADMIN_HASH.length < 10) {
+                toast.error('Admin password hash is invalid or missing in configuration.');
                 return;
             }
 
             const trimmedPassword = password.trim();
-            const isMatch = await bcrypt.compare(trimmedPassword, ADMIN_HASH.trim());
+            const isMatch = await bcrypt.compare(trimmedPassword, ADMIN_HASH);
 
             if (isMatch) {
                 onLogin(trimmedPassword);
@@ -44,8 +49,8 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
                 toast.error('Invalid password');
             }
         } catch (error) {
-            console.error('Login error details:', error);
-            toast.error('Login error: ' + (error instanceof Error ? error.message : 'Unknown'));
+            console.error('Password comparison failed:', error);
+            toast.error('Verification failed. Check your configuration.');
         } finally {
             setLoading(false);
         }

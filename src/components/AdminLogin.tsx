@@ -22,22 +22,20 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
         setLoading(true);
 
         try {
-            const response = await fetch('/api/admin/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
+            const ADMIN_HASH = import.meta.env.VITE_ADMIN_PASSWORD_HASH || '';
+            if (!ADMIN_HASH) {
+                toast.error('Admin not configured. Set VITE_ADMIN_PASSWORD_HASH in environment.');
+                return;
+            }
+            const isMatch = await bcrypt.compare(password, ADMIN_HASH);
+            if (isMatch) {
                 onLogin(password);
                 toast.success('Access granted');
             } else {
-                toast.error(data.message || 'Invalid credentials');
+                toast.error('Invalid password');
             }
         } catch (error) {
-            toast.error('Could not connect to authentication server');
+            toast.error('Login error: ' + (error instanceof Error ? error.message : 'Unknown'));
         } finally {
             setLoading(false);
         }

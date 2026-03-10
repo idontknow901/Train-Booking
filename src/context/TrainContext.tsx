@@ -7,6 +7,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
   setDoc,
   query,
   getDocs,
@@ -46,28 +47,38 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
   // Sync Trains
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'trains'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Train));
-      setTrains(data);
-    });
+    const unsub = onSnapshot(collection(db, 'trains'),
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Train));
+        setTrains(data);
+      },
+      (error) => console.error("Trains sync error:", error)
+    );
     return unsub;
   }, []);
 
   // Sync Bookings
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as Booking);
-      setBookings(data);
-    });
+    const unsub = onSnapshot(collection(db, 'bookings'),
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => doc.data() as Booking);
+        console.log("Bookings updated:", data.length);
+        setBookings(data);
+      },
+      (error) => console.error("Bookings sync error:", error)
+    );
     return unsub;
   }, []);
 
   // Sync Stations
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'stations'), (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as Station);
-      setStations(data);
-    });
+    const unsub = onSnapshot(collection(db, 'stations'),
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => doc.data() as Station);
+        setStations(data);
+      },
+      (error) => console.error("Stations sync error:", error)
+    );
     return unsub;
   }, []);
 
@@ -109,11 +120,10 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
     // We need to fetch current train data to update the seat
     // Note: In production, use runTransaction for atomicity
-    const trainsQuery = await getDocs(query(collection(db, 'trains')));
-    const trainDoc = trainsQuery.docs.find(d => d.id === trainId);
+    const trainSnap = await getDoc(trainRef);
 
-    if (trainDoc) {
-      const trainData = trainDoc.data() as Train;
+    if (trainSnap.exists()) {
+      const trainData = trainSnap.data() as Train;
       const updatedCoaches = trainData.coaches.map(coach => {
         if (coach.id !== coachId) return coach;
         return {
@@ -145,6 +155,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         return booking;
       }
     }
+
 
     return null;
   }, [settings.bookingOpen]);

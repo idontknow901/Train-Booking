@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import AdminLogin from '@/components/AdminLogin';
-import { Train, Coach, Station } from '@/types/train';
+import { Train, Coach, Station, Booking } from '@/types/train';
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -94,8 +94,12 @@ export default function Admin() {
               checked={settings.bookingOpen}
               onCheckedChange={async () => {
                 const toastId = toast.loading('Updating settings...');
-                await toggleBooking();
-                toast.success(`Reservations are now ${!settings.bookingOpen ? 'OPEN' : 'CLOSED'}`, { id: toastId });
+                try {
+                  await toggleBooking();
+                  toast.success(`Reservations are now ${!settings.bookingOpen ? 'OPEN' : 'CLOSED'}`, { id: toastId });
+                } catch (e) {
+                  toast.error('Failed to update settings', { id: toastId });
+                }
               }}
             />
             <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${settings.bookingOpen ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
@@ -169,7 +173,7 @@ export default function Admin() {
   );
 }
 
-function PassengerList({ bookings, onClearAll }: { bookings: any[], onClearAll: () => Promise<void> }) {
+function PassengerList({ bookings, onClearAll }: { bookings: Booking[], onClearAll: () => Promise<void> }) {
   if (bookings.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -192,8 +196,12 @@ function PassengerList({ bookings, onClearAll }: { bookings: any[], onClearAll: 
           onClick={async () => {
             if (!confirm('Clear all booking records?')) return;
             const tId = toast.loading('Clearing bookings...');
-            await onClearAll();
-            toast.success('Bookings cleared', { id: tId });
+            try {
+              await onClearAll();
+              toast.success('Bookings cleared successfully', { id: tId });
+            } catch (e) {
+              toast.error('Failed to clear bookings', { id: tId });
+            }
           }}
           className="text-destructive hover:bg-destructive/10 font-bold"
         >
@@ -211,8 +219,9 @@ function PassengerList({ bookings, onClearAll }: { bookings: any[], onClearAll: 
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {bookings.map(b => (
+              {[...bookings].sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime()).map(b => (
                 <tr key={b.pnr} className="hover:bg-muted/30 transition-colors">
+
                   <td className="px-6 py-4 font-mono font-bold text-accent">{b.pnr}</td>
                   <td className="px-6 py-4 font-bold text-foreground">{b.username}</td>
                   <td className="px-6 py-4 text-foreground">{b.trainName} <span className="text-[10px] opacity-50 ml-1">#{b.trainNumber}</span></td>
@@ -243,8 +252,12 @@ function TrainList({ trains, onRemove, onClearAll }: { trains: Train[], onRemove
             onClick={async () => {
               if (!confirm('Remove all trains from the database?')) return;
               const tId = toast.loading('Wiping train records...');
-              await onClearAll();
-              toast.success('All trains removed', { id: tId });
+              try {
+                await onClearAll();
+                toast.success('All trains removed successfully', { id: tId });
+              } catch (e) {
+                toast.error('Failed to remove trains', { id: tId });
+              }
             }}
             className="text-destructive hover:bg-destructive/10 font-bold"
           >
@@ -277,8 +290,12 @@ function TrainList({ trains, onRemove, onClearAll }: { trains: Train[], onRemove
                 size="icon"
                 onClick={async () => {
                   const toastId = toast.loading(`Removing ${train.name}...`);
-                  await onRemove(train.id);
-                  toast.success(`${train.name} removed`, { id: toastId });
+                  try {
+                    await onRemove(train.id);
+                    toast.success(`${train.name} removed successfully`, { id: toastId });
+                  } catch (e) {
+                    toast.error(`Failed to remove ${train.name}`, { id: toastId });
+                  }
                 }}
                 className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
               >
@@ -438,20 +455,24 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
 function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: Station[], onAdd: (s: Station) => Promise<void>, onRemove: (code: string) => Promise<void>, onClearAll: () => Promise<void> }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAdd = async () => {
     if (!name || !code) {
       toast.error('Please enter name and code');
       return;
     }
+    setIsSubmitting(true);
     const toastId = toast.loading(`Creating station ${name}...`);
     try {
       await onAdd({ name, code: code.toUpperCase() });
       setName('');
       setCode('');
-      toast.success('Station added', { id: toastId });
+      toast.success('Station added successfully', { id: toastId });
     } catch (e) {
       toast.error('Failed to add station', { id: toastId });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -518,12 +539,13 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Station Code</label>
-            <Input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="e.g. KOAA" maxLength={5} className="rounded-xl font-mono uppercase" />
+            <Input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="e.g. KOAA" maxLength={5} className="rounded-xl font-mono uppercase" disabled={isSubmitting} />
           </div>
-          <Button onClick={handleAdd} className="w-full h-11 bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl font-bold shadow-lg shadow-accent/20 transition-all active:scale-[0.98]">
-            Create Station
+          <Button onClick={handleAdd} disabled={isSubmitting || !name || !code} className="w-full h-11 bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl font-bold shadow-lg shadow-accent/20 transition-all active:scale-[0.98]">
+            {isSubmitting ? 'Creating...' : 'Create Station'}
           </Button>
         </div>
+
       </div>
     </div>
   );

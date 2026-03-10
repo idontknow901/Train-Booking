@@ -46,18 +46,20 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
     try {
       const booking = await bookSeat(train.id, selectedCoach, selectedSeat.id, username.trim(), journeyDate, origin, destination);
       if (booking) {
-        setConfirmedBooking(booking);
         toast.success(`Ticket booked! PNR: ${booking.pnr}`, { id: toastId });
+        setConfirmedBooking(booking);
         setSelectedSeat(null);
         setUsername('');
       } else {
         toast.error('Seat already booked or system error', { id: toastId });
       }
     } catch (error) {
-      toast.error('Booking failed. Please try again.', { id: toastId });
+      console.error("Booking error:", error);
+      toast.error('Booking failed. Please check your connection.', { id: toastId });
     } finally {
       setIsBooking(false);
     }
+
   };
 
   if (confirmedBooking) {

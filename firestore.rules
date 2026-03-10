@@ -12,19 +12,23 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
-    // TRAINS: Passengers can update train documents to mark seats as booked
+    // TRAINS: Admin and Passengers
     match /trains/{train} {
-      allow update: if true;
-      allow create, delete: if false; 
+      allow read: if true;
+      allow write: if true; // Allow Admin to manage trains
     }
     
-    // ADMIN DATA: For now, allowing writes so your Admin panel works from the browser.
-    // To make this truly secure, you should use Firebase Auth for the Admin login.
+    // STATIONS: Admin
     match /stations/{station} {
+      allow read: if true;
       allow write: if true;
     }
+
+    // SETTINGS: Admin
     match /settings/{setting} {
+      allow read: if true;
       allow write: if true;
     }
+
   }
 }

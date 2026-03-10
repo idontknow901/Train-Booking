@@ -1,0 +1,246 @@
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  setDoc,
+  query,
+  getDocs,
+  writeBatch
+} from 'firebase/firestore';
+import { Train, Booking, GlobalSettings, Station } from '@/types/train';
+
+interface TrainContextType {
+  trains: Train[];
+  bookings: Booking[];
+  settings: GlobalSettings;
+  stations: Station[];
+  addTrain: (train: Train) => Promise<void>;
+  removeTrain: (trainId: string) => Promise<void>;
+  bookSeat: (trainId: string, coachId: string, seatId: string, username: string, journeyDate: string, origin: string, destination: string) => Promise<Booking | null>;
+  resetAllSeats: () => Promise<void>;
+  toggleBooking: () => Promise<void>;
+  getTrainsByRoute: (origin: string, destination: string, date?: string) => Train[];
+  addStation: (station: Station) => Promise<void>;
+  removeStation: (code: string) => Promise<void>;
+  clearAllTrains: () => Promise<void>;
+  clearAllStations: () => Promise<void>;
+  clearAllBookings: () => Promise<void>;
+}
+
+const TrainContext = createContext<TrainContextType | null>(null);
+
+function generatePNR(): string {
+  return Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
+}
+
+export function TrainProvider({ children }: { children: React.ReactNode }) {
+  const [trains, setTrains] = useState<Train[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
+  const [settings, setSettings] = useState<GlobalSettings>({ bookingOpen: true });
+
+  // Sync Trains
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'trains'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Train));
+      setTrains(data);
+    });
+    return unsub;
+  }, []);
+
+  // Sync Bookings
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      const data = snapshot.docs.map(doc => doc.data() as Booking);
+      setBookings(data);
+    });
+    return unsub;
+  }, []);
+
+  // Sync Stations
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'stations'), (snapshot) => {
+      const data = snapshot.docs.map(doc => doc.data() as Station);
+      setStations(data);
+    });
+    return unsub;
+  }, []);
+
+  // Sync Settings
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
+      if (snapshot.exists()) {
+        setSettings(snapshot.data() as GlobalSettings);
+      } else {
+        // Initialize settings if they don't exist
+        setDoc(doc(db, 'settings', 'global'), { bookingOpen: true });
+      }
+    });
+    return unsub;
+  }, []);
+
+  const addTrain = useCallback(async (train: Train) => {
+    await setDoc(doc(db, 'trains', train.id), train);
+  }, []);
+
+  const removeTrain = useCallback(async (trainId: string) => {
+    await deleteDoc(doc(db, 'trains', trainId));
+  }, []);
+
+  const addStation = useCallback(async (station: Station) => {
+    await setDoc(doc(db, 'stations', station.code), station);
+  }, []);
+
+  const removeStation = useCallback(async (code: string) => {
+    await deleteDoc(doc(db, 'stations', code));
+  }, []);
+
+  const bookSeat = useCallback(async (trainId: string, coachId: string, seatId: string, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
+    if (!settings.bookingOpen) return null;
+
+    const trainRef = doc(db, 'trains', trainId);
+    const pnr = generatePNR();
+    let booking: Booking | null = null;
+
+    // We need to fetch current train data to update the seat
+    // Note: In production, use runTransaction for atomicity
+    const trainsQuery = await getDocs(query(collection(db, 'trains')));
+    const trainDoc = trainsQuery.docs.find(d => d.id === trainId);
+
+    if (trainDoc) {
+      const trainData = trainDoc.data() as Train;
+      const updatedCoaches = trainData.coaches.map(coach => {
+        if (coach.id !== coachId) return coach;
+        return {
+          ...coach,
+          seats: coach.seats.map(seat => {
+            if (seat.id !== seatId || seat.isBooked) return seat;
+            booking = {
+              pnr,
+              username,
+              trainId,
+              trainName: trainData.name,
+              trainNumber: trainData.number,
+              coachId: coach.id,
+              seatNumber: seat.number,
+              seatPosition: seat.position,
+              journeyDate,
+              origin,
+              destination,
+              bookedAt: new Date().toISOString(),
+            };
+            return { ...seat, isBooked: true, bookedBy: username, pnr };
+          }),
+        };
+      });
+
+      if (booking) {
+        await updateDoc(trainRef, { coaches: updatedCoaches });
+        await setDoc(doc(db, 'bookings', pnr), booking);
+        return booking;
+      }
+    }
+
+    return null;
+  }, [settings.bookingOpen]);
+
+  const resetAllSeats = useCallback(async () => {
+    try {
+      const trainsQuery = await getDocs(collection(db, 'trains'));
+      const batch = writeBatch(db);
+
+      trainsQuery.docs.forEach(trainDoc => {
+        const trainData = trainDoc.data() as Train;
+        const resetCoaches = trainData.coaches.map(coach => ({
+          ...coach,
+          seats: coach.seats.map(seat => ({
+            ...seat,
+            isBooked: false,
+            bookedBy: null,
+            pnr: null,
+          })),
+        }));
+        batch.update(trainDoc.ref, { coaches: resetCoaches });
+      });
+
+      const bookingsQuery = await getDocs(collection(db, 'bookings'));
+      bookingsQuery.docs.forEach(bookingDoc => {
+        batch.delete(bookingDoc.ref);
+      });
+
+      await batch.commit();
+      console.log('Successfully reset all seats and bookings');
+    } catch (error) {
+      console.error('Error resetting seats:', error);
+      throw error;
+    }
+  }, []);
+
+  const clearAllTrains = useCallback(async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'trains'));
+      const batch = writeBatch(db);
+      querySnapshot.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    } catch (e) { console.error(e); throw e; }
+  }, []);
+
+  const clearAllStations = useCallback(async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'stations'));
+      const batch = writeBatch(db);
+      querySnapshot.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    } catch (e) { console.error(e); throw e; }
+  }, []);
+
+  const clearAllBookings = useCallback(async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'bookings'));
+      const batch = writeBatch(db);
+      querySnapshot.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    } catch (e) { console.error(e); throw e; }
+  }, []);
+
+  const toggleBooking = useCallback(async () => {
+    await updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen });
+  }, [settings.bookingOpen]);
+
+  const getTrainsByRoute = useCallback((origin: string, destination: string, date?: string) => {
+    return trains.filter(train => {
+      const routeCodes = train.route.map(s => s.code);
+      const onRoute = routeCodes.includes(origin) && routeCodes.includes(destination);
+      if (!onRoute) return false;
+
+      if (date && train.availableDate) {
+        // Simple string comparison for dates (expected as YYYY-MM-DD or similar)
+        return train.availableDate === date;
+      }
+      return true;
+    });
+  }, [trains]);
+
+  return (
+    <TrainContext.Provider value={{
+      trains, bookings, settings, stations,
+      addTrain, removeTrain, bookSeat, resetAllSeats,
+      toggleBooking, getTrainsByRoute, addStation, removeStation,
+      clearAllTrains, clearAllStations, clearAllBookings
+    }}>
+      {children}
+    </TrainContext.Provider>
+  );
+}
+
+export function useTrainContext() {
+  const ctx = useContext(TrainContext);
+  if (!ctx) throw new Error('useTrainContext must be used within TrainProvider');
+  return ctx;
+}
+

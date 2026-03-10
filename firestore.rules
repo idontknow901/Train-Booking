@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // PUBLIC READ: Anyone can view trains, stations, and bookings
+    match /{document=**} {
+      allow read: if true;
+    }
+    
+    // BOOKINGS: Passengers can create booking records
+    match /bookings/{booking} {
+      allow create: if true;
+      allow update, delete: if false;
+    }
+    
+    // TRAINS: Passengers can update train documents to mark seats as booked
+    match /trains/{train} {
+      allow update: if true;
+      allow create, delete: if false; 
+    }
+    
+    // ADMIN DATA: For now, allowing writes so your Admin panel works from the browser.
+    // To make this truly secure, you should use Firebase Auth for the Admin login.
+    match /stations/{station} {
+      allow write: if true;
+    }
+    match /settings/{setting} {
+      allow write: if true;
+    }
+  }
+}

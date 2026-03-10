@@ -32,6 +32,34 @@ app.get('/api/ping', (req, res) => {
     res.json({ ok: true, env: process.env.NODE_ENV || 'development' });
 });
 
+app.get('/api/pnr/verify', async (req, res) => {
+    const { pnr } = req.query;
+    if (!pnr) return res.status(400).json({ valid: false, message: 'PNR required' });
+
+    const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID;
+    const API_KEY = process.env.VITE_FIREBASE_API_KEY;
+
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/bookings/${pnr}?key=${API_KEY}`;
+        const response = await fetch(url);
+
+        if (response.status === 404) {
+            return res.status(200).json({ valid: false, message: 'PNR not found' });
+        }
+
+        const data = await response.json();
+        const fields = data.fields;
+
+        res.json({
+            valid: true,
+            username: fields.username.stringValue,
+            pnr: fields.pnr.stringValue
+        });
+    } catch (error) {
+        res.status(500).json({ valid: false, message: error.message });
+    }
+});
+
 app.post('/api/admin/verify', async (req, res) => {
     const { password } = req.body;
 

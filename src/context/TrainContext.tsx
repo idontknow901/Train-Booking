@@ -44,8 +44,16 @@ async function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> 
   return Promise.race([promise, timeout]);
 }
 
-function generatePNR(): string {
-  return Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
+function generatePNR(existingBookings: Booking[]): string {
+  let pnr: string;
+  let isDuplicate: boolean;
+
+  do {
+    pnr = Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
+    isDuplicate = existingBookings.some(b => b.pnr === pnr);
+  } while (isDuplicate);
+
+  return pnr;
 }
 
 export function TrainProvider({ children }: { children: React.ReactNode }) {
@@ -145,7 +153,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const trainRef = doc(db, 'trains', trainId);
-      const pnr = generatePNR();
+      const pnr = generatePNR(bookings);
       let booking: Booking | null = null;
 
       // We need to fetch current train data to update the seat
@@ -192,7 +200,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     }
 
     return null;
-  }, [settings.bookingOpen]);
+  }, [settings.bookingOpen, bookings]);
 
   const resetAllSeats = useCallback(async () => {
     try {

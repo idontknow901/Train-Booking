@@ -35,6 +35,14 @@ interface TrainContextType {
 
 const TrainContext = createContext<TrainContextType | null>(null);
 
+const TIMEOUT_MS = 30000;
+
+async function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`System Timeout: ${message} (Check Vercel Config)`)), TIMEOUT_MS)
+  );
+  return Promise.race([promise, timeout]);
+}
 
 function generatePNR(): string {
   return Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
@@ -103,7 +111,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   const addTrain = useCallback(async (train: Train) => {
     console.log('addTrain: Attempting write...', train.id);
     try {
-      await setDoc(doc(db, 'trains', train.id), train);
+      await withTimeout(setDoc(doc(db, 'trains', train.id), train), 'Adding train');
       console.log('addTrain: SUCCESS');
     } catch (e: any) {
       const errCode = e.code ? `(${e.code})` : '';
@@ -113,13 +121,13 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeTrain = useCallback(async (trainId: string) => {
-    await deleteDoc(doc(db, 'trains', trainId));
+    await withTimeout(deleteDoc(doc(db, 'trains', trainId)), 'Removing train');
   }, []);
 
   const addStation = useCallback(async (station: Station) => {
     console.log('addStation: Attempting write...', station.code);
     try {
-      await setDoc(doc(db, 'stations', station.code), station);
+      await withTimeout(setDoc(doc(db, 'stations', station.code), station), 'Adding station');
       console.log('addStation: SUCCESS');
     } catch (e: any) {
       const errCode = e.code ? `(${e.code})` : '';
@@ -129,7 +137,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeStation = useCallback(async (code: string) => {
-    await deleteDoc(doc(db, 'stations', code));
+    await withTimeout(deleteDoc(doc(db, 'stations', code)), 'Removing station');
   }, []);
 
   const bookSeat = useCallback(async (trainId: string, coachId: string, seatId: string, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
@@ -142,7 +150,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
       // We need to fetch current train data to update the seat
       // Note: In production, use runTransaction for atomicity
-      const trainSnap = await getDoc(trainRef);
+      const trainSnap = await withTimeout(getDoc(trainRef), 'Fetching train for booking');
 
       if (trainSnap.exists()) {
         const trainData = trainSnap.data() as Train;
@@ -172,8 +180,8 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (booking) {
-          await updateDoc(trainRef, { coaches: updatedCoaches });
-          await setDoc(doc(db, 'bookings', pnr), booking);
+          await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
+          await withTimeout(setDoc(doc(db, 'bookings', pnr), booking), 'Saving booking');
           return booking;
         }
       }
@@ -246,7 +254,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleBooking = useCallback(async () => {
-    await updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen });
+    await withTimeout(updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen }), 'Toggling reservations');
   }, [settings.bookingOpen]);
 
   const getTrainsByRoute = useCallback((origin: string, destination: string, date?: string) => {

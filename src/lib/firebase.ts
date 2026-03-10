@@ -11,6 +11,17 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// Diagnostic: Check for missing config in production
+if (import.meta.env.PROD) {
+    const missing = Object.entries(firebaseConfig)
+        .filter(([_, v]) => !v)
+        .map(([k]) => k);
+    if (missing.length > 0) {
+        console.error('🔥 CRITICAL: Missing Firebase Config on Vercel:', missing);
+    }
+}
+
 // Disable local persistence to prevent "stuck" writes in IndexedDB
 export const db = initializeFirestore(app, {
     localCache: memoryLocalCache()

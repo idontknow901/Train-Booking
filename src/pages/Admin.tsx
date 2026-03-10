@@ -465,9 +465,9 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
       // Reset fields immediately on success
       setName('');
       setCode('');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to add station:', e);
-      toast.error('Failed to add station. Check console for details.');
+      toast.error(e.message || 'Failed to add station. Check connection.');
     } finally {
       setIsSubmitting(false);
     }

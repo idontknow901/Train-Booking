@@ -113,9 +113,10 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     try {
       await withTimeout(setDoc(doc(db, 'trains', train.id), train), 'Adding train');
       console.log('addTrain: SUCCESS');
-    } catch (e) {
+    } catch (e: any) {
+      const errCode = e.code ? `(${e.code})` : '';
       console.error('addTrain: ERROR', e);
-      throw e;
+      throw new Error(`Failed to add train ${errCode}: ${e.message}`);
     }
   }, []);
 
@@ -128,9 +129,10 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     try {
       await withTimeout(setDoc(doc(db, 'stations', station.code), station), 'Adding station');
       console.log('addStation: SUCCESS');
-    } catch (e) {
+    } catch (e: any) {
+      const errCode = e.code ? `(${e.code})` : '';
       console.error('addStation: ERROR', e);
-      throw e;
+      throw new Error(`Failed to add station ${errCode}: ${e.message}`);
     }
   }, []);
 
@@ -141,48 +143,53 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   const bookSeat = useCallback(async (trainId: string, coachId: string, seatId: string, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
     if (!settings.bookingOpen) return null;
 
-    const trainRef = doc(db, 'trains', trainId);
-    const pnr = generatePNR();
-    let booking: Booking | null = null;
+    try {
+      const trainRef = doc(db, 'trains', trainId);
+      const pnr = generatePNR();
+      let booking: Booking | null = null;
 
-    // We need to fetch current train data to update the seat
-    // Note: In production, use runTransaction for atomicity
-    const trainSnap = await withTimeout(getDoc(trainRef), 'Fetching train for booking');
+      // We need to fetch current train data to update the seat
+      // Note: In production, use runTransaction for atomicity
+      const trainSnap = await withTimeout(getDoc(trainRef), 'Fetching train for booking');
 
-    if (trainSnap.exists()) {
-      const trainData = trainSnap.data() as Train;
-      const updatedCoaches = trainData.coaches.map(coach => {
-        if (coach.id !== coachId) return coach;
-        return {
-          ...coach,
-          seats: coach.seats.map(seat => {
-            if (seat.id !== seatId || seat.isBooked) return seat;
-            booking = {
-              pnr,
-              username,
-              trainId,
-              trainName: trainData.name,
-              trainNumber: trainData.number,
-              coachId: coach.id,
-              seatNumber: seat.number,
-              seatPosition: seat.position,
-              journeyDate,
-              origin,
-              destination,
-              bookedAt: new Date().toISOString(),
-            };
-            return { ...seat, isBooked: true, bookedBy: username, pnr };
-          }),
-        };
-      });
+      if (trainSnap.exists()) {
+        const trainData = trainSnap.data() as Train;
+        const updatedCoaches = trainData.coaches.map(coach => {
+          if (coach.id !== coachId) return coach;
+          return {
+            ...coach,
+            seats: coach.seats.map(seat => {
+              if (seat.id !== seatId || seat.isBooked) return seat;
+              booking = {
+                pnr,
+                username,
+                trainId,
+                trainName: trainData.name,
+                trainNumber: trainData.number,
+                coachId: coach.id,
+                seatNumber: seat.number,
+                seatPosition: seat.position,
+                journeyDate,
+                origin,
+                destination,
+                bookedAt: new Date().toISOString(),
+              };
+              return { ...seat, isBooked: true, bookedBy: username, pnr };
+            }),
+          };
+        });
 
-      if (booking) {
-        await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
-        await withTimeout(setDoc(doc(db, 'bookings', pnr), booking), 'Saving booking');
-        return booking;
+        if (booking) {
+          await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
+          await withTimeout(setDoc(doc(db, 'bookings', pnr), booking), 'Saving booking');
+          return booking;
+        }
       }
+    } catch (e: any) {
+      const errCode = e.code ? `(${e.code})` : '';
+      console.error('bookSeat: ERROR', e);
+      throw new Error(`Booking failed ${errCode}: ${e.message}`);
     }
-
 
     return null;
   }, [settings.bookingOpen]);

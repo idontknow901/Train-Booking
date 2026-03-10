@@ -63,11 +63,10 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
 
     return (
         <div className="min-h-[80vh] flex items-center justify-center p-4">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+            <div
                 className="w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-xl"
             >
+
                 <div className="text-center mb-8">
                     <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
                         <Shield className="h-8 w-8 text-primary" />
@@ -106,7 +105,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
                         {loading ? 'Verifying...' : 'Unlock System'}
                     </Button>
                 </form>
-            </motion.div>
+            </div>
         </div>
     );
 }

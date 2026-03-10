@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Train, Coach, Seat } from '@/types/train';
 import { useTrainContext } from '@/context/TrainContext';
 import { Button } from '@/components/ui/button';
@@ -67,7 +66,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
@@ -110,45 +109,40 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
         <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border seat-selected" /> Selected</span>
       </div>
 
-      <AnimatePresence>
-        {selectedSeat && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="rounded-xl border border-accent/30 bg-accent/5 p-5"
-          >
-            <h3 className="mb-3 font-bold text-foreground flex items-center gap-2">
-              <Ticket className="h-5 w-5 text-accent" />
-              Seat #{selectedSeat.number} — {selectedSeat.position}
-            </h3>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative flex-1">
-                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Roblox Username"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  className="pl-10"
-                  maxLength={50}
-                />
-              </div>
-              <Button
-                onClick={handleBook}
-                disabled={!username.trim() || !settings.bookingOpen || isBooking}
-                className="bg-accent text-accent-foreground hover:bg-accent/90 font-semibold"
-              >
-                {isBooking ? (
-                  <>Processing...</>
-                ) : (
-                  <><Ticket className="mr-2 h-4 w-4" /> Generate Ticket</>
-                )}
-              </Button>
+      {selectedSeat && (
+        <div
+          className="rounded-xl border border-accent/30 bg-accent/5 p-5"
+        >
+          <h3 className="mb-3 font-bold text-foreground flex items-center gap-2">
+            <Ticket className="h-5 w-5 text-accent" />
+            Seat #{selectedSeat.number} — {selectedSeat.position}
+          </h3>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Roblox Username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                className="pl-10"
+                maxLength={50}
+              />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            <Button
+              onClick={handleBook}
+              disabled={!username.trim() || !settings.bookingOpen || isBooking}
+              className="bg-accent text-accent-foreground hover:bg-accent/90 font-semibold"
+            >
+              {isBooking ? (
+                <>Processing...</>
+              ) : (
+                <><Ticket className="mr-2 h-4 w-4" /> Generate Ticket</>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -165,17 +159,15 @@ function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selecte
           if (isSelected) cls = 'seat-selected';
 
           return (
-            <motion.button
+            <button
               key={seat.id}
-              whileHover={!seat.isBooked ? { scale: 1.1 } : {}}
-              whileTap={!seat.isBooked ? { scale: 0.95 } : {}}
               className={`flex h-10 w-full items-center justify-center rounded border text-xs font-mono font-semibold transition-colors ${cls}`}
               onClick={() => !seat.isBooked && onSelectSeat(seat)}
               disabled={seat.isBooked}
               title={`Seat ${seat.number} - ${seat.position}${seat.isBooked ? ` (Booked by ${seat.bookedBy})` : ''}`}
             >
               {seat.number}
-            </motion.button>
+            </button>
           );
         })}
       </div>

@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { Train as TrainIcon, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Train } from '@/types/train';
@@ -67,19 +66,13 @@ const Index = () => {
       {/* Main */}
       <main className="mx-auto max-w-6xl px-4 py-12">
         {view === 'search' && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-          >
+          <div>
             <div className="mb-12 text-center max-w-2xl mx-auto">
-              <motion.span
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+              <span
                 className="inline-block px-3 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-black uppercase tracking-widest mb-4 border border-accent/20"
               >
                 Seamless Travel Experience
-              </motion.span>
+              </span>
               <h2 className="text-4xl md:text-5xl font-black text-foreground tracking-tighter leading-tight">
                 Your Next <span className="text-gradient">Journey</span> Starts Here
               </h2>
@@ -89,23 +82,19 @@ const Index = () => {
             </div>
 
             {!settings.bookingOpen ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+              <div
                 className="py-16 text-center bg-card border border-border border-dashed rounded-[2rem] shadow-sm overflow-hidden relative"
               >
                 <div className="absolute top-0 inset-x-0 h-1.5 bg-destructive/20" />
                 <h3 className="text-3xl font-black text-destructive mb-3">Reservations are Suspended</h3>
                 <p className="text-muted-foreground max-w-md mx-auto">Our system is currently undergoing scheduled maintenance. Please check back shortly for availability.</p>
-              </motion.div>
+              </div>
             ) : (
               <div className="space-y-12">
                 <TrainSearch onSearch={handleSearch} />
 
                 {results.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                  <div
                     className="space-y-6"
                   >
                     <div className="flex items-center gap-4 px-2">
@@ -114,17 +103,15 @@ const Index = () => {
                       <div className="h-px flex-1 bg-border" />
                     </div>
                     <TrainList trains={results} onSelectTrain={handleSelectTrain} />
-                  </motion.div>
+                  </div>
                 )}
               </div>
             )}
-          </motion.div>
+          </div>
         )}
 
         {view === 'seatmap' && selectedTrain && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+          <div
             className="max-w-4xl mx-auto"
           >
             <SeatMap
@@ -134,7 +121,7 @@ const Index = () => {
               destination={searchParams.destination}
               onBack={() => { setView('search'); setSelectedTrain(null); }}
             />
-          </motion.div>
+          </div>
         )}
       </main>
 

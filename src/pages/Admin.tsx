@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Shield, Train as TrainIcon, Users, RotateCcw, Plus, ArrowLeft, Power, BarChart3, MapPin, Trash2, Calendar } from 'lucide-react';
 import { useTrainContext } from '@/context/TrainContext';
@@ -64,11 +63,8 @@ export default function Admin() {
             { label: 'Booked', value: bookedSeats, icon: Users, color: 'text-destructive', bg: 'bg-destructive/10' },
             { label: 'Available', value: totalSeats - bookedSeats, icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
           ].map((stat, idx) => (
-            <motion.div
+            <div
               key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
               className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all"
             >
               <div className="flex items-center gap-3">
@@ -78,7 +74,7 @@ export default function Admin() {
                 <span className="text-sm font-medium text-muted-foreground">{stat.label}</span>
               </div>
               <p className={`mt-3 font-mono text-3xl font-bold ${stat.color}`}>{stat.value}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 

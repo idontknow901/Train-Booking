@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Search, ArrowRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,9 +21,7 @@ export default function TrainSearch({ onSearch }: TrainSearchProps) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
       className="rounded-xl border border-border bg-card p-6 shadow-lg"
     >
       <div className="mb-6 flex items-center gap-3">
@@ -89,7 +86,7 @@ export default function TrainSearch({ onSearch }: TrainSearchProps) {
       >
         <Search className="mr-2 h-4 w-4" /> Find Trains
       </Button>
-    </motion.div>
+    </div>
   );
 }
 

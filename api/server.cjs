@@ -4,7 +4,9 @@ const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 const path = require('path');
 
-dotenv.config({ path: path.join(__dirname, '../.env') });
+if (process.env.NODE_ENV !== 'production') {
+    dotenv.config({ path: path.join(__dirname, '../.env') });
+}
 
 const app = express();
 app.use(cors());
@@ -55,7 +57,11 @@ app.get('*', (req, res) => {
     });
 });
 
-const PORT = 3001;
-app.listen(PORT, () => {
-    console.log(`API server running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = 3001;
+    app.listen(PORT, () => {
+        console.log(`API server running on http://localhost:${PORT}`);
+    });
+}
+
+module.exports = app;

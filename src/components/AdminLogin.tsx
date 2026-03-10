@@ -17,7 +17,11 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const stripQuotes = (str: string) => str.replace(/^['"]|['"]$/g, '');
+    const cleanHash = (str: string) => {
+        return str
+            .replace(/^['"]|['"]$/g, '') // Remove surrounding quotes
+            .replace(/\$\$/g, '$');      // Unescape double dollar signs if necessary
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -25,7 +29,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
 
         try {
             const rawHash = import.meta.env.VITE_ADMIN_PASSWORD_HASH || '';
-            const ADMIN_HASH = stripQuotes(rawHash.trim());
+            const ADMIN_HASH = cleanHash(rawHash.trim());
 
             console.log('Login attempt debug:', {
                 hasHash: !!ADMIN_HASH,

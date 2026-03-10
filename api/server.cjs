@@ -12,8 +12,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const stripQuotes = (str) => str.replace(/^['"]|['"]$/g, '');
-const ADMIN_HASH = stripQuotes((process.env.ADMIN_PASSWORD_HASH || '').trim());
+const cleanHash = (str) => str.replace(/^['"]|['"]$/g, '').replace(/\$\$/g, '$');
+const ADMIN_HASH = cleanHash((process.env.ADMIN_PASSWORD_HASH || '').trim());
 console.log('🔐 ADMIN_HASH set?', !!ADMIN_HASH && ADMIN_HASH.length > 10);
 
 // Serve static files from the dist directory (if built)

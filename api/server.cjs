@@ -12,10 +12,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const ADMIN_HASH = process.env.ADMIN_PASSWORD_HASH;
+const ADMIN_HASH = (process.env.ADMIN_PASSWORD_HASH || '').trim();
+console.log('🔐 ADMIN_HASH set?', !!ADMIN_HASH);
 
 // Serve static files from the dist directory (if built)
 app.use(express.static(path.join(__dirname, '../dist')));
+
+// Simple health check endpoint for debugging
+app.get('/api/ping', (req, res) => {
+    res.json({ ok: true, env: process.env.NODE_ENV || 'development' });
+});
 
 app.post('/api/admin/verify', async (req, res) => {
     const { password } = req.body;

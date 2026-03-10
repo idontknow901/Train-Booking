@@ -20,23 +20,31 @@ app.use(express.static(path.join(__dirname, '../dist')));
 app.post('/api/admin/verify', async (req, res) => {
     const { password } = req.body;
 
+    if (!password) {
+        return res.status(400).json({ success: false, message: 'Password is required' });
+    }
+
     if (!ADMIN_HASH) {
-        // Fallback for demo if no hash is set in .env
-        if (password === 'admin123') {
-            return res.json({ success: true, message: 'Authenticated' });
-        }
-        return res.status(401).json({ success: false, message: 'No admin password configured' });
+        console.error('SERVER ERROR: ADMIN_PASSWORD_HASH is not set');
+        return res.status(500).json({
+            success: false,
+            message: 'Server configuration error: Admin hash not found in environment'
+        });
     }
 
     try {
-        const isMatch = await bcrypt.compare(password, ADMIN_HASH);
+        const isMatch = await bcrypt.compare(password, ADMIN_HASH.trim());
         if (isMatch) {
             res.json({ success: true, message: 'Authenticated' });
         } else {
             res.status(401).json({ success: false, message: 'Invalid password' });
         }
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('BCRYPT ERROR:', error);
+        res.status(500).json({
+            success: false,
+            message: `Server comparison error: ${error.message || 'Unknown error'}`
+        });
     }
 });
 

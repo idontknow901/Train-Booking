@@ -11,9 +11,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-
-// Using initializeFirestore with experimentalForceLongPolling for better reliability
-// on restrictive networks (solves "hanging" writes)
 export const db = initializeFirestore(app, {
     experimentalForceLongPolling: true,
 });

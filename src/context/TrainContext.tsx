@@ -35,7 +35,7 @@ interface TrainContextType {
 
 const TrainContext = createContext<TrainContextType | null>(null);
 
-const TIMEOUT_MS = 10000;
+const TIMEOUT_MS = 20000;
 
 async function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
@@ -147,7 +147,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
     // We need to fetch current train data to update the seat
     // Note: In production, use runTransaction for atomicity
-    const trainSnap = await getDoc(trainRef);
+    const trainSnap = await withTimeout(getDoc(trainRef), 'Fetching train for booking');
 
     if (trainSnap.exists()) {
       const trainData = trainSnap.data() as Train;
@@ -189,7 +189,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
   const resetAllSeats = useCallback(async () => {
     try {
-      const trainsQuery = await getDocs(collection(db, 'trains'));
+      const trainsQuery = await withTimeout(getDocs(collection(db, 'trains')), 'Fetching trains for reset');
       const batch = writeBatch(db);
 
       trainsQuery.docs.forEach(trainDoc => {
@@ -206,7 +206,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         batch.update(trainDoc.ref, { coaches: resetCoaches });
       });
 
-      const bookingsQuery = await getDocs(collection(db, 'bookings'));
+      const bookingsQuery = await withTimeout(getDocs(collection(db, 'bookings')), 'Fetching bookings for reset');
       bookingsQuery.docs.forEach(bookingDoc => {
         batch.delete(bookingDoc.ref);
       });
@@ -221,7 +221,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
   const clearAllTrains = useCallback(async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'trains'));
+      const querySnapshot = await withTimeout(getDocs(collection(db, 'trains')), 'Fetching trains for wipe');
       const batch = writeBatch(db);
       querySnapshot.forEach((doc) => batch.delete(doc.ref));
       await withTimeout(batch.commit(), 'Wiping trains');
@@ -230,7 +230,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
   const clearAllStations = useCallback(async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'stations'));
+      const querySnapshot = await withTimeout(getDocs(collection(db, 'stations')), 'Fetching stations for wipe');
       const batch = writeBatch(db);
       querySnapshot.forEach((doc) => batch.delete(doc.ref));
       await withTimeout(batch.commit(), 'Wiping stations');
@@ -239,7 +239,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
   const clearAllBookings = useCallback(async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'bookings'));
+      const querySnapshot = await withTimeout(getDocs(collection(db, 'bookings')), 'Fetching bookings for wipe');
       const batch = writeBatch(db);
       querySnapshot.forEach((doc) => batch.delete(doc.ref));
       await withTimeout(batch.commit(), 'Wiping bookings');

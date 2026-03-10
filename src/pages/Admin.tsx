@@ -343,10 +343,16 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
     try {
       await onAdd(train);
       toast.success(`Train "${name}" added!`);
-      setName(''); setNumber(''); setOrigin(''); setDestination(''); setDate('');
+      // Reset form
+      setName('');
+      setNumber('');
+      setOrigin('');
+      setDestination('');
+      setDate('');
       setCoaches([{ type: 'SL', seats: 72 }]);
     } catch (e) {
-      toast.error('Failed to add train. Check Firestore permissions.');
+      console.error('Failed to add train:', e);
+      toast.error('Failed to add train. Check console for details.');
     } finally {
       setIsSubmitting(false);
     }
@@ -453,12 +459,15 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
     }
     setIsSubmitting(true);
     try {
-      await onAdd({ name, code: code.toUpperCase() });
+      const station = { name, code: code.toUpperCase() };
+      await onAdd(station);
+      toast.success(`Station "${name}" added!`);
+      // Reset fields immediately on success
       setName('');
       setCode('');
-      toast.success(`Station "${name}" added!`);
     } catch (e) {
-      toast.error('Failed to add station. Check Firestore permissions.');
+      console.error('Failed to add station:', e);
+      toast.error('Failed to add station. Check console for details.');
     } finally {
       setIsSubmitting(false);
     }

@@ -23,22 +23,33 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
 
         try {
             const ADMIN_HASH = import.meta.env.VITE_ADMIN_PASSWORD_HASH || '';
+            console.log('Login attempt: checking hash format...', {
+                hasHash: !!ADMIN_HASH,
+                length: ADMIN_HASH.length,
+                prefix: ADMIN_HASH.substring(0, 10)
+            });
+
             if (!ADMIN_HASH) {
-                toast.error('Admin not configured. Set VITE_ADMIN_PASSWORD_HASH in environment.');
+                toast.error('Admin password hash missing in .env file.');
                 return;
             }
-            const isMatch = await bcrypt.compare(password, ADMIN_HASH);
+
+            const trimmedPassword = password.trim();
+            const isMatch = await bcrypt.compare(trimmedPassword, ADMIN_HASH.trim());
+
             if (isMatch) {
-                onLogin(password);
+                onLogin(trimmedPassword);
                 toast.success('Access granted');
             } else {
                 toast.error('Invalid password');
             }
         } catch (error) {
+            console.error('Login error details:', error);
             toast.error('Login error: ' + (error instanceof Error ? error.message : 'Unknown'));
         } finally {
             setLoading(false);
         }
+
     };
 
     return (

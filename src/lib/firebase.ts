@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { initializeFirestore, onSnapshotsInSync } from 'firebase/firestore';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -11,6 +11,15 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// Using initializeFirestore with experimentalForceLongPolling for better reliability
+// on restrictive networks (solves "hanging" writes)
 export const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    experimentalForceLongPolling: true,
 });
+
+// Monitor sync status
+onSnapshotsInSync(db, () => {
+    console.log('--- Firestore Snapshots are in sync with server ---');
+});
+

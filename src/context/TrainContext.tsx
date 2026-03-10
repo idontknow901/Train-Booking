@@ -35,6 +35,15 @@ interface TrainContextType {
 
 const TrainContext = createContext<TrainContextType | null>(null);
 
+const TIMEOUT_MS = 10000;
+
+async function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Timeout: ${message}`)), TIMEOUT_MS)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 function generatePNR(): string {
   return Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
 }
@@ -49,7 +58,9 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'trains'),
       (snapshot) => {
+        const fromCache = snapshot.metadata.fromCache;
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Train));
+        console.log(`Trains updated (fromCache: ${fromCache}, count: ${data.length})`);
         setTrains(data);
       },
       (error) => console.error("Trains sync error:", error)
@@ -74,7 +85,9 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'stations'),
       (snapshot) => {
+        const fromCache = snapshot.metadata.fromCache;
         const data = snapshot.docs.map(doc => doc.data() as Station);
+        console.log(`Stations updated (fromCache: ${fromCache}, count: ${data.length})`);
         setStations(data);
       },
       (error) => console.error("Stations sync error:", error)
@@ -96,19 +109,33 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addTrain = useCallback(async (train: Train) => {
-    await setDoc(doc(db, 'trains', train.id), train);
+    console.log('addTrain: Attempting write...', train.id);
+    try {
+      await withTimeout(setDoc(doc(db, 'trains', train.id), train), 'Adding train');
+      console.log('addTrain: SUCCESS');
+    } catch (e) {
+      console.error('addTrain: ERROR', e);
+      throw e;
+    }
   }, []);
 
   const removeTrain = useCallback(async (trainId: string) => {
-    await deleteDoc(doc(db, 'trains', trainId));
+    await withTimeout(deleteDoc(doc(db, 'trains', trainId)), 'Removing train');
   }, []);
 
   const addStation = useCallback(async (station: Station) => {
-    await setDoc(doc(db, 'stations', station.code), station);
+    console.log('addStation: Attempting write...', station.code);
+    try {
+      await withTimeout(setDoc(doc(db, 'stations', station.code), station), 'Adding station');
+      console.log('addStation: SUCCESS');
+    } catch (e) {
+      console.error('addStation: ERROR', e);
+      throw e;
+    }
   }, []);
 
   const removeStation = useCallback(async (code: string) => {
-    await deleteDoc(doc(db, 'stations', code));
+    await withTimeout(deleteDoc(doc(db, 'stations', code)), 'Removing station');
   }, []);
 
   const bookSeat = useCallback(async (trainId: string, coachId: string, seatId: string, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
@@ -150,8 +177,8 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (booking) {
-        await updateDoc(trainRef, { coaches: updatedCoaches });
-        await setDoc(doc(db, 'bookings', pnr), booking);
+        await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
+        await withTimeout(setDoc(doc(db, 'bookings', pnr), booking), 'Saving booking');
         return booking;
       }
     }

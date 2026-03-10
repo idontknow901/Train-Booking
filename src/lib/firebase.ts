@@ -1,3 +1,4 @@
+// Firebase Initialization (Vercel Build Trigger)
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore, memoryLocalCache, onSnapshotsInSync } from 'firebase/firestore';
 

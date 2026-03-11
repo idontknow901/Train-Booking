@@ -42,14 +42,13 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background selection:bg-accent/30">
+    <div className="min-h-screen flex flex-col bg-background selection:bg-accent/30">
       {/* Header */}
       <header className="border-b border-border bg-primary/95 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
-
             <div>
-              <h1 className="text-xl font-black text-primary-foreground tracking-tight leading-none">Epic Rail Of India</h1>
+              <h1 className="text-xl font-black text-primary-foreground tracking-tight leading-none">Epic Rails Of India</h1>
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/50 mt-1">Train Booking</p>
             </div>
           </div>
@@ -63,39 +62,39 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main */}
-      <main className="mx-auto max-w-6xl px-4 py-12">
+      {/* Main Content Area */}
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
         {view === 'search' && (
-          <div>
-            <div className="mb-12 text-center max-w-2xl mx-auto">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="mb-6 text-center max-w-2xl mx-auto">
               <span
                 className="inline-block px-3 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-black uppercase tracking-widest mb-4 border border-accent/20"
               >
-                Welcome to EROICTC
+                Welcome to BSCTC
               </span>
               <h2 className="text-4xl md:text-5xl font-black text-foreground tracking-tighter leading-tight">
                 Your Next <span className="text-gradient">Journey</span> Starts Here
               </h2>
-              <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
+              <p className="mt-2 text-muted-foreground text-sm leading-relaxed">
                 Connect to India's most advanced railway network. Pick your seat, get instant PNR, and travel in style.
               </p>
             </div>
 
             {!settings.bookingOpen ? (
               <div
-                className="py-16 text-center bg-card border border-border border-dashed rounded-[2rem] shadow-sm overflow-hidden relative"
+                className="py-10 text-center bg-card border border-border border-dashed rounded-[2rem] shadow-sm overflow-hidden relative"
               >
                 <div className="absolute top-0 inset-x-0 h-1.5 bg-destructive/20" />
-                <h3 className="text-3xl font-black text-destructive mb-3">Reservations are Suspended</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">Our system is currently undergoing scheduled maintenance. Please check back shortly for availability.</p>
+                <h3 className="text-2xl font-black text-destructive mb-2">Reservations are Suspended</h3>
+                <p className="text-muted-foreground max-w-md mx-auto text-sm">Our system is currently undergoing scheduled maintenance. Please check back shortly.</p>
               </div>
             ) : (
-              <div className="space-y-12">
+              <div className="space-y-8">
                 <TrainSearch onSearch={handleSearch} />
 
                 {results.length > 0 && (
                   <div
-                    className="space-y-6"
+                    className="space-y-6 pb-10"
                   >
                     <div className="flex items-center gap-4 px-2">
                       <div className="h-px flex-1 bg-border" />
@@ -112,7 +111,7 @@ const Index = () => {
 
         {view === 'seatmap' && selectedTrain && (
           <div
-            className="max-w-4xl mx-auto"
+            className="max-w-4xl mx-auto animate-in fade-in duration-500"
           >
             <SeatMap
               train={selectedTrain}
@@ -125,12 +124,21 @@ const Index = () => {
         )}
       </main>
 
-      {/* Footer Info */}
-      <footer className="mt-20 border-t border-border bg-card/50 py-12">
-        <div className="mx-auto max-w-6xl px-4 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-center md:text-left">
-            <h4 className="text-sm font-bold text-foreground">Powered by Cloud</h4>
-            <p className="text-xs text-muted-foreground mt-1">Real-time synchronization across all passenger terminals.</p>
+      {/* Footer Info - Now scrolls with the page */}
+      <footer className="border-t border-border mt-auto pt-2 pb-1 w-full">
+        <div className="mx-auto max-w-6xl px-6 flex flex-col md:flex-row justify-between items-end gap-6">
+          <div className="text-left pb-1">
+            <h4 className="text-lg font-bold text-foreground uppercase tracking-wider leading-none">Powered by Cloud</h4>
+            <p className="text-[11px] text-muted-foreground mt-1 font-medium">
+              EROI: The next generation of railway simulation and management.
+            </p>
+          </div>
+
+          <div className="text-right pb-1">
+            <p className="text-sm text-muted-foreground leading-tight italic font-medium max-w-md">
+              This platform is a fictional simulation for the EROI game. <br className="hidden md:block" />
+              Real-world ticket bookings are not facilitated here.
+            </p>
           </div>
         </div>
       </footer>

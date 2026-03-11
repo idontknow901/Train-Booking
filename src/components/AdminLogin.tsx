@@ -89,8 +89,8 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
                                 className="pl-10 h-12 rounded-xl"
+                                autoComplete="new-password"
                                 required
                             />
                             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />

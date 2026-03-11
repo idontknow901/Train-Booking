@@ -54,7 +54,7 @@ export default function Admin() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-4">
         {/* Stats */}
         <div className="mb-8 grid gap-4 grid-cols-2 md:grid-cols-4">
           {[
@@ -162,6 +162,7 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
       </main>
+      
     </div>
   );
 }

@@ -49,7 +49,7 @@ const Index = () => {
           <div className="flex items-center gap-3">
 
             <div>
-              <h1 className="text-xl font-black text-primary-foreground tracking-tight leading-none">Booking</h1>
+              <h1 className="text-xl font-black text-primary-foreground tracking-tight leading-none">EROICTC</h1>
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/50 mt-1">Premium Rail Network</p>
             </div>
           </div>

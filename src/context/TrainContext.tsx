@@ -190,6 +190,15 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         if (booking) {
           await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
           await withTimeout(setDoc(doc(db, 'bookings', pnr), booking), 'Saving booking');
+          
+          // Send Discord Webhook notification
+          try {
+            const { sendBookingWebhook } = await import('@/lib/discord');
+            sendBookingWebhook(booking);
+          } catch (error) {
+            console.error('Failed to trigger Discord webhook:', error);
+          }
+
           return booking;
         }
       }

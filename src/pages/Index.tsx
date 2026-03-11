@@ -49,8 +49,8 @@ const Index = () => {
           <div className="flex items-center gap-3">
 
             <div>
-              <h1 className="text-xl font-black text-primary-foreground tracking-tight leading-none">EROICTC</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/50 mt-1">Premium Rail Network</p>
+              <h1 className="text-xl font-black text-primary-foreground tracking-tight leading-none">Epic Rail Of India</h1>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/50 mt-1">Train Booking</p>
             </div>
           </div>
           <Link
@@ -71,7 +71,7 @@ const Index = () => {
               <span
                 className="inline-block px-3 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-black uppercase tracking-widest mb-4 border border-accent/20"
               >
-                Seamless Travel Experience
+                Welcome to EROICTC
               </span>
               <h2 className="text-4xl md:text-5xl font-black text-foreground tracking-tighter leading-tight">
                 Your Next <span className="text-gradient">Journey</span> Starts Here

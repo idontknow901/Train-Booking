@@ -302,7 +302,7 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
               <Ticket className="h-5 w-5 text-orange-400" />
               <h3 className="text-xl font-black text-foreground">
                 {selectedSeats.length > 0 ? (
-                  `Seat #${selectedSeats[0].number} — ${selectedSeats[0].position}`
+                  `Seats ${selectedSeats.map(s => `#${s.number}`).join(', ')} — ${selectedSeats.map(s => s.position).join(', ')}`
                 ) : (
                   'Passenger Assignment'
                 )}

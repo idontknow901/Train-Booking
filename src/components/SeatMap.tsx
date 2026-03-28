@@ -368,7 +368,7 @@ function SeatGrid({
                 title={`${seat.number} - ${seat.position}${isOccupied ? ` (Booked for this segment)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
               >
                 <span className="text-2xl font-black tracking-tighter">{displayStatus}</span>
-                {!isUnavailable && <span className="text-[10px] uppercase font-black opacity-60 tracking-[0.1em] mt-0.5">{seat.position}</span>}
+                {!isUnavailable && <span className="text-xs uppercase font-black opacity-80 tracking-widest mt-0.5">{seat.position}</span>}
               </button>
             );
           })}

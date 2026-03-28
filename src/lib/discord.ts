@@ -14,12 +14,12 @@ export async function sendBookingWebhook(booking: Booking, train: Train) {
   const getStationName = (code: string) => train.route.find(s => s.code === code)?.name || code;
  
   const embed = {
-    title: `🚂 New Train Booking ${titleSuffix}!`,
-    color: color,
+    title: `🚂 New Train Booking Confirmed!`,
+    color: 0x10b981, // Green
     fields: [
       {
         name: '🚥 Status',
-        value: `**${booking.status === 'CNF' ? 'Confirmed (CNF)' : `${booking.status} / ${booking.queueNumber}`}**`,
+        value: `**Confirmed (CNF)**`,
         inline: false,
       },
       {
@@ -55,9 +55,9 @@ export async function sendBookingWebhook(booking: Booking, train: Train) {
         inline: false,
       },
       {
-        name: '💺 Seat Info',
-        value: booking.status === 'WL' ? 'Not Assigned' : `Coach: ${booking.coachId.split('-')[0] || 'Pending'} | Seat: ${booking.seatNumber || 'Pending'} (${booking.seatPosition || 'Pending'})`,
-        inline: true,
+        name: '💺 Seat Information',
+        value: booking.seats.map(s => `Coach: ${s.coachId.split('-')[1] || s.coachId} | Seat: ${s.number} (${s.position})`).join('\n'),
+        inline: false,
       },
       {
         name: '📅 Journey Date',

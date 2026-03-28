@@ -1,266 +1,150 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import {
-  collection,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDoc,
-  setDoc,
-  query,
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  getDoc, 
   getDocs,
+  query,
+  where,
+  setDoc,
   writeBatch
 } from 'firebase/firestore';
-import { Train, Booking, GlobalSettings, Station, Seat } from '@/types/train';
-import { GameTrainBookingSystem } from '@/lib/bookingEngine';
+import { Train, Station, Booking, Seat, GlobalSettings, Coach } from '@/types/train';
+import { toast } from 'sonner';
 
 interface TrainContextType {
   trains: Train[];
+  stations: Station[];
   bookings: Booking[];
   settings: GlobalSettings;
-  stations: Station[];
   addTrain: (train: Train) => Promise<void>;
-  removeTrain: (trainId: string) => Promise<void>;
-  bookSeat: (trainId: string, coachId: string | null, coachType: string, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string) => Promise<Booking | null>;
-  resetAllSeats: () => Promise<void>;
-  toggleBooking: () => Promise<void>;
-  getTrainsByRoute: (origin: string, destination: string, date?: string) => Train[];
+  updateTrain: (train: Train) => Promise<void>;
+  removeTrain: (id: string) => Promise<void>;
   addStation: (station: Station) => Promise<void>;
   removeStation: (code: string) => Promise<void>;
-  clearAllTrains: () => Promise<void>;
-  clearAllStations: () => Promise<void>;
-  clearAllBookings: () => Promise<void>;
+  bookSeat: (
+    trainId: string, 
+    coachId: string, 
+    coachType: string, 
+    origin: string, 
+    destination: string, 
+    journeyDate: string, 
+    username: string, 
+    selectedSeats: Seat[]
+  ) => Promise<Booking | null>;
   cancelBooking: (pnr: string) => Promise<void>;
+  resetAllSeats: () => Promise<void>;
+  clearAllTrains: () => Promise<void>;
+  updateSettings: (settings: Partial<GlobalSettings>) => Promise<void>;
 }
 
-const TrainContext = createContext<TrainContextType | null>(null);
+const TrainContext = createContext<TrainContextType | undefined>(undefined);
 
-const TIMEOUT_MS = 30000;
-
-async function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`System Timeout: ${message} (Check Vercel Config)`)), TIMEOUT_MS)
-  );
-  return Promise.race([promise, timeout]);
-}
-
-function generatePNR(existingBookings: Booking[]): string {
-  let pnr: string;
-  let isDuplicate: boolean;
-
-  do {
-    pnr = Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
-    isDuplicate = existingBookings.some(b => b.pnr === pnr);
-  } while (isDuplicate);
-
-  return pnr;
-}
+const withTimeout = (promise: Promise<any>, actionName: string, timeoutMs: number = 8000) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${actionName} timed out after ${timeoutMs}ms`)), timeoutMs))
+  ]);
+};
 
 export function TrainProvider({ children }: { children: React.ReactNode }) {
   const [trains, setTrains] = useState<Train[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
-  const [settings, setSettings] = useState<GlobalSettings>({ bookingOpen: true });
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [settings, setSettings] = useState<GlobalSettings>({
+    bookingOpen: true,
+    lastBackup: new Date().toISOString()
+  });
 
-  // Sync Trains
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'trains'),
-      (snapshot) => {
-        const fromCache = snapshot.metadata.fromCache;
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Train));
-        console.log(`Trains updated (fromCache: ${fromCache}, count: ${data.length})`);
-        setTrains(data);
-      },
-      (error) => console.error("Trains sync error:", error)
-    );
-    return unsub;
-  }, []);
-
-  // Sync Bookings
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'bookings'),
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => doc.data() as Booking);
-        console.log("Bookings updated:", data.length);
-        setBookings(data);
-      },
-      (error) => console.error("Bookings sync error:", error)
-    );
-    return unsub;
-  }, []);
-
-  // Sync Stations
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'stations'),
-      (snapshot) => {
-        const fromCache = snapshot.metadata.fromCache;
-        const data = snapshot.docs.map(doc => doc.data() as Station);
-        console.log(`Stations updated (fromCache: ${fromCache}, count: ${data.length})`);
-        setStations(data);
-      },
-      (error) => console.error("Stations sync error:", error)
-    );
-    return unsub;
-  }, []);
-
-  // Sync Settings
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
-      if (snapshot.exists()) {
-        setSettings(snapshot.data() as GlobalSettings);
-      } else {
-        // Initialize settings if they don't exist
-        setDoc(doc(db, 'settings', 'global'), { bookingOpen: true });
-      }
+    const unsubTrains = onSnapshot(collection(db, 'trains'), (snapshot) => {
+      setTrains(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Train)));
     });
-    return unsub;
+    const unsubStations = onSnapshot(collection(db, 'stations'), (snapshot) => {
+      setStations(snapshot.docs.map(doc => doc.data() as Station));
+    });
+    const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      setBookings(snapshot.docs.map(doc => doc.data() as Booking));
+    });
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
+      if (snapshot.exists()) setSettings(snapshot.data() as GlobalSettings);
+    });
+
+    return () => {
+      unsubTrains();
+      unsubStations();
+      unsubBookings();
+      unsubSettings();
+    };
   }, []);
 
   const addTrain = useCallback(async (train: Train) => {
-    console.log('addTrain: Attempting write...', train.id);
-    try {
-      await withTimeout(setDoc(doc(db, 'trains', train.id), train), 'Adding train');
-      console.log('addTrain: SUCCESS');
-    } catch (e: any) {
-      const errCode = e.code ? `(${e.code})` : '';
-      console.error('addTrain: ERROR', e);
-      throw new Error(`Failed to add train ${errCode}: ${e.message}`);
-    }
+    await withTimeout(setDoc(doc(db, 'trains', train.id), train), 'Adding train');
   }, []);
 
-  const removeTrain = useCallback(async (trainId: string) => {
-    await withTimeout(deleteDoc(doc(db, 'trains', trainId)), 'Removing train');
+  const updateTrain = useCallback(async (train: Train) => {
+    await withTimeout(updateDoc(doc(db, 'trains', train.id), { ...train }), 'Updating train');
+  }, []);
+
+  const removeTrain = useCallback(async (id: string) => {
+    await withTimeout(deleteDoc(doc(db, 'trains', id)), 'Removing train');
   }, []);
 
   const addStation = useCallback(async (station: Station) => {
-    console.log('addStation: Attempting write...', station.code);
-    try {
-      await withTimeout(setDoc(doc(db, 'stations', station.code), station), 'Adding station');
-      console.log('addStation: SUCCESS');
-    } catch (e: any) {
-      const errCode = e.code ? `(${e.code})` : '';
-      console.error('addStation: ERROR', e);
-      throw new Error(`Failed to add station ${errCode}: ${e.message}`);
-    }
+    await withTimeout(setDoc(doc(db, 'stations', station.code), station), 'Adding station');
   }, []);
 
   const removeStation = useCallback(async (code: string) => {
     await withTimeout(deleteDoc(doc(db, 'stations', code)), 'Removing station');
   }, []);
 
-  const bookSeat = useCallback(async (trainId: string, coachId: string | null, coachType: string, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
-    if (!settings.bookingOpen) return null;
+  const bookSeat = useCallback(async (
+    trainId: string,
+    coachId: string,
+    coachType: string,
+    origin: string,
+    destination: string,
+    journeyDate: string,
+    username: string,
+    selectedSeats: Seat[]
+  ) => {
+    if (!settings.bookingOpen) {
+      toast.error('Booking is currently closed for maintenance');
+      return null;
+    }
 
     try {
       const trainRef = doc(db, 'trains', trainId);
-      const pnr = generatePNR(bookings);
-      let booking: Booking | null = null;
-
-      // We need to fetch current train data to update the seat
-      // Note: In production, use runTransaction for atomicity
-      const trainSnap = await withTimeout(getDoc(trainRef), 'Fetching train for booking');
+      const trainSnap = await getDoc(trainRef);
 
       if (trainSnap.exists()) {
         const trainData = trainSnap.data() as Train;
+        const pnr = Math.random().toString().substring(2, 12);
 
-        // --- Game System Architecture Integration (Class-Pooled Queues) ---
-        // 1. Gather ONLY Physical Seats for the requested Class/CoachType
-        const classCoaches = trainData.coaches.filter(c => c.type === coachType);
-        const classPhysicalSeats: { coachId: string; seat: Seat }[] = [];
-        classCoaches.forEach(coach => {
-          coach.seats.forEach(seat => classPhysicalSeats.push({ coachId: coach.id, seat }));
-        });
-        const physicalSeatIds = classPhysicalSeats.map(s => s.seat.id);
-
-        // 2. Determine Caps based on Class Capacity
-        const totalPhysicalSeats = classPhysicalSeats.length;
-        const SOFT_CAP = classCoaches[0]?.maxConfirmed || Math.floor(totalPhysicalSeats * 0.9);
-        const RAC_OVERFLOW = (coachType === 'SL' ? 8 : 4); // SL has more RAC slots than 3A/2A
-        const RAC_CAP = SOFT_CAP + RAC_OVERFLOW;
-
-        const engine = new GameTrainBookingSystem(
-          trainData.route.map(s => s.code),
-          physicalSeatIds,
-          SOFT_CAP,
-          RAC_CAP
-        );
-
-        // 3. Hydrate engine with existing bookings ONLY for this Class/CoachType
-        const currentClassBookings = bookings.filter(b => 
-            b.trainId === trainId && 
-            b.journeyDate === journeyDate && 
-            b.coachType === coachType
-        );
-        const sortedBookings = currentClassBookings.sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
-
-        for (const existing of sortedBookings) {
-          const rCheck = engine.isValidRoute(existing.origin, existing.destination);
-          if (rCheck.valid) {
-            const eb = {
-              playerId: existing.username,
-              startStation: existing.origin, endStation: existing.destination,
-              startIndex: rCheck.startIndex, endIndex: rCheck.endIndex,
-              status: existing.status as any || 'CNF',
-              seatId: existing.seatNumber ? classPhysicalSeats.find(cps => cps.coachId === existing.coachId && cps.seat.number === existing.seatNumber)?.seat.id || null : null,
-              queueNumber: existing.queueNumber || 0
-            };
-            engine.bookings.push(eb);
-            if (eb.seatId) {
-                const eSeat = engine.seats.find(s => s.id === eb.seatId);
-                if (eSeat) eSeat.bookings.push(eb);
-            }
-          }
-        }
-
-        // 3. Request new booking status from the Engine!
-        let resultTicket;
-        try {
-          resultTicket = engine.bookTicket(username, origin, destination, seatId);
-        } catch (err: any) {
-          console.error('Engine rejected booking:', err);
-          return null;
-        }
-
-        // Map assigned seat ID back to coach data
-        let assignedCoachId = '';
-        let assignedSeatNumber = 0;
-        let assignedSeatPosition = 'Pending';
-
-        if (resultTicket.seatId) {
-          const seatData = classPhysicalSeats.find(s => s.seat.id === resultTicket.seatId);
-          if (seatData) {
-            assignedCoachId = seatData.coachId;
-            assignedSeatNumber = seatData.seat.number;
-            assignedSeatPosition = seatData.seat.position;
-          }
-        }
-
-        // 4. Update the specific selected physical seat if CNF was achieved
-        // We no longer rely strictly on "isBooked" blocking segment reuse! We can reuse if engine allowed it.
+        // Update the physical seats in the train document
         const updatedCoaches = trainData.coaches.map(coach => {
-          if (resultTicket.status === 'CNF' && coach.id === assignedCoachId) {
-            return {
-              ...coach,
-              seats: coach.seats.map(seat => {
-                if (seat.number === assignedSeatNumber) {
-                  // Just updating local property for easy UI rendering, but true truth is in engine 
-                  return { ...seat, isBooked: true, bookedBy: username, pnr };
-                }
-                return seat;
-              })
-            };
-          }
-          return coach;
+           if (coach.id === coachId) {
+              const updatedSeats = coach.seats.map(seat => {
+                 const isSelected = selectedSeats.some(s => s.id === seat.id);
+                 if (isSelected) {
+                    if (seat.isBooked) throw new Error(`Seat ${seat.number} was just booked by someone else.`);
+                    return { ...seat, isBooked: true, bookedBy: username, pnr };
+                 }
+                 return seat;
+              });
+              return { ...coach, seats: updatedSeats };
+           }
+           return coach;
         });
 
         const originIdx = trainData.route.findIndex(s => s.code === origin);
         const destIdx = trainData.route.findIndex(s => s.code === destination);
         const routeStops = trainData.route.slice(originIdx, destIdx + 1).map(s => s.code);
-
-        // 5. Generate Full Status Snapshot
-        const initialStatusStr = resultTicket.status === 'CNF' ? 'CNF' : `${resultTicket.status} ${resultTicket.queueNumber}`;
 
         const newBooking: Booking = {
           pnr,
@@ -268,20 +152,20 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           trainId,
           trainName: trainData.name,
           trainNumber: trainData.number,
-          coachId: assignedCoachId || coachId || '',
-          coachType: coachType,
-          seatNumber: assignedSeatNumber,
-          seatPosition: assignedSeatPosition,
+          coachId,
+          coachType,
+          seats: selectedSeats.map(s => ({
+            number: s.number,
+            position: s.position,
+            coachId: coachId
+          })),
           journeyDate,
           origin,
           destination,
           routeStops,
           bookedAt: new Date().toISOString(),
-          status: resultTicket.status, // Legacy
-          initialStatus: initialStatusStr,
-          currentStatus: resultTicket.status,
-          queueNumber: resultTicket.queueNumber
-        } as unknown as Booking;
+          status: 'CNF'
+        };
 
         await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
         await withTimeout(setDoc(doc(db, 'bookings', pnr), newBooking), 'Saving booking');
@@ -297,92 +181,44 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         return newBooking;
       }
     } catch (e: any) {
-      const errCode = e.code ? `(${e.code})` : '';
       console.error('bookSeat: ERROR', e);
-      throw new Error(`Booking failed ${errCode}: ${e.message}`);
+      toast.error(e.message || 'Booking failed');
+      throw e;
     }
 
     return null;
-  }, [settings.bookingOpen, bookings]);
- 
-  const promoteQueue = useCallback(async (trainId: string, journeyDate: string, coachType: string) => {
-    try {
-       const trainSnap = await getDoc(doc(db, 'trains', trainId));
-       if (!trainSnap.exists()) return;
-       const trainData = trainSnap.data() as Train;
-
-       // 1. Gather class config
-       const classCoaches = trainData.coaches.filter(c => c.type === coachType);
-       const classPhysicalSeats: { coachId: string; seat: Seat }[] = [];
-       classCoaches.forEach(coach => {
-         coach.seats.forEach(seat => classPhysicalSeats.push({ coachId: coach.id, seat }));
-       });
-       const physicalSeatIds = classPhysicalSeats.map(s => s.seat.id);
-       const SOFT_CAP = classCoaches[0]?.maxConfirmed || Math.floor(classPhysicalSeats.length * 0.9);
-       const RAC_CAP = SOFT_CAP + (coachType === 'SL' ? 8 : 4);
-
-       const engine = new GameTrainBookingSystem(
-         trainData.route.map(s => s.code),
-         physicalSeatIds,
-         SOFT_CAP,
-         RAC_CAP
-       );
-
-       // 2. Fetch current bookings
-       const bookingsSnap = await getDocs(collection(db, 'bookings'));
-       const allBookings = bookingsSnap.docs.map(d => d.data() as Booking);
-       const classBookings = allBookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate && b.coachType === coachType);
-       const sorted = [...classBookings].sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
-
-       // 3. Batch re-process
-       for (const b of sorted) {
-          // Resolve current seatId to prefer it during re-booking
-          const currentSeatId = classPhysicalSeats.find(cps => cps.coachId === b.coachId && cps.seat.number === b.seatNumber)?.seat.id || null;
-          
-          const res = engine.bookTicket(b.username, b.origin, b.destination, currentSeatId);
-          
-          let assignedCoachId = '';
-          let assignedSeatNumber = 0;
-          let assignedSeatPosition = 'Pending';
-
-          if (res.seatId) {
-             const sData = classPhysicalSeats.find(s => s.seat.id === res.seatId);
-             if (sData) {
-                assignedCoachId = sData.coachId;
-                assignedSeatNumber = sData.seat.number;
-                assignedSeatPosition = sData.seat.position;
-             }
-          }
-
-          if (res.status !== b.currentStatus || assignedSeatNumber !== b.seatNumber) {
-             await updateDoc(doc(db, 'bookings', b.pnr), {
-               currentStatus: res.status,
-               status: res.status, // Legacy
-               seatNumber: assignedSeatNumber,
-               coachId: assignedCoachId,
-               seatPosition: assignedSeatPosition,
-               queueNumber: res.queueNumber
-             });
-          }
-       }
-    } catch (e) {
-       console.error('Promotion Engine Error:', e);
-    }
-  }, []);
+  }, [settings.bookingOpen]);
 
   const cancelBooking = useCallback(async (pnr: string) => {
     try {
-      const bookingToCancel = bookings.find(b => b.pnr === pnr);
-      await withTimeout(deleteDoc(doc(db, 'bookings', pnr)), 'Cancelling booking');
-      
-      if (bookingToCancel) {
-        await promoteQueue(bookingToCancel.trainId, bookingToCancel.journeyDate, bookingToCancel.coachType);
+      const booking = bookings.find(b => b.pnr === pnr);
+      if (!booking) return;
+
+      const trainRef = doc(db, 'trains', booking.trainId);
+      const trainSnap = await getDoc(trainRef);
+
+      if (trainSnap.exists()) {
+        const trainData = trainSnap.data() as Train;
+        const updatedCoaches = trainData.coaches.map(coach => {
+          if (coach.id === booking.coachId) {
+             const updatedSeats = coach.seats.map(seat => {
+                if (seat.pnr === pnr) {
+                   return { ...seat, isBooked: false, bookedBy: null, pnr: null };
+                }
+                return seat;
+             });
+             return { ...coach, seats: updatedSeats };
+          }
+          return coach;
+        });
+        await updateDoc(trainRef, { coaches: updatedCoaches });
       }
+
+      await withTimeout(deleteDoc(doc(db, 'bookings', pnr)), 'Cancelling booking');
     } catch (e) {
       console.error('cancelBooking: ERROR', e);
-      throw e;
     }
-  }, [bookings, promoteQueue]);
+  }, [bookings]);
 
   const resetAllSeats = useCallback(async () => {
     try {
@@ -409,64 +245,38 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       });
 
       await batch.commit();
-      console.log('Successfully reset all seats and bookings');
     } catch (error) {
       console.error('Error resetting seats:', error);
-      throw error;
     }
   }, []);
 
   const clearAllTrains = useCallback(async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'trains'));
-      const batch = writeBatch(db);
-      querySnapshot.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
-    } catch (e) { console.error(e); throw e; }
+    const querySnapshot = await getDocs(collection(db, 'trains'));
+    const batch = writeBatch(db);
+    querySnapshot.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
   }, []);
 
-  const clearAllStations = useCallback(async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'stations'));
-      const batch = writeBatch(db);
-      querySnapshot.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
-    } catch (e) { console.error(e); throw e; }
+  const updateSettings = useCallback(async (newSettings: Partial<GlobalSettings>) => {
+    await updateDoc(doc(db, 'settings', 'global'), newSettings);
   }, []);
-
-  const clearAllBookings = useCallback(async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'bookings'));
-      const batch = writeBatch(db);
-      querySnapshot.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
-    } catch (e) { console.error(e); throw e; }
-  }, []);
-
-  const toggleBooking = useCallback(async () => {
-    await withTimeout(updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen }), 'Toggling reservations');
-  }, [settings.bookingOpen]);
-
-  const getTrainsByRoute = useCallback((origin: string, destination: string, date?: string) => {
-    return trains.filter(train => {
-      const routeCodes = train.route.map(s => s.code);
-      const onRoute = routeCodes.includes(origin) && routeCodes.includes(destination);
-      if (!onRoute) return false;
-
-      if (date && train.availableDate) {
-        // Simple string comparison for dates (expected as YYYY-MM-DD or similar)
-        return train.availableDate === date;
-      }
-      return true;
-    });
-  }, [trains]);
 
   return (
     <TrainContext.Provider value={{
-      trains, bookings, settings, stations,
-      addTrain, removeTrain, bookSeat, resetAllSeats,
-      toggleBooking, getTrainsByRoute, addStation, removeStation,
-      clearAllTrains, clearAllStations, clearAllBookings, cancelBooking
+      trains,
+      stations,
+      bookings,
+      settings,
+      addTrain,
+      updateTrain,
+      removeTrain,
+      addStation,
+      removeStation,
+      bookSeat,
+      cancelBooking,
+      resetAllSeats,
+      clearAllTrains,
+      updateSettings,
     }}>
       {children}
     </TrainContext.Provider>
@@ -474,8 +284,9 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useTrainContext() {
-  const ctx = useContext(TrainContext);
-  if (!ctx) throw new Error('useTrainContext must be used within TrainProvider');
-  return ctx;
+  const context = useContext(TrainContext);
+  if (context === undefined) {
+    throw new Error('useTrainContext must be used within a TrainProvider');
+  }
+  return context;
 }
-

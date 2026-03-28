@@ -109,16 +109,11 @@ const MyBookings = () => {
                 </div>
                 
                 <div className="flex flex-col items-end gap-2">
-                    <Badge variant="outline" className={`border-none font-black text-xs px-4 py-1.5 shadow-sm ${
-                       foundBooking.currentStatus === 'CNF' ? 'bg-emerald-500/10 text-emerald-600' : 
-                       foundBooking.currentStatus === 'RAC' ? 'bg-amber-500/10 text-amber-600' : 
-                       'bg-destructive/10 text-destructive'
-                    }`}>
-                      {foundBooking.currentStatus === 'CNF' ? 'CONFIRMED' : `${foundBooking.currentStatus} Q-${foundBooking.queueNumber}`}
+                    <Badge variant="outline" className="border-none font-black text-xs px-4 py-1.5 shadow-sm bg-emerald-500/10 text-emerald-600">
+                      CONFIRMED (CNF)
                     </Badge>
                     <div className="flex flex-col items-end">
-                       <p className="text-[10px] font-black uppercase text-muted-foreground">Status tracking live</p>
-                       <p className="text-[9px] font-bold text-muted-foreground/60 uppercase mt-0.5">Booked as: <span className="text-accent">{foundBooking.initialStatus}</span></p>
+                       <p className="text-[10px] font-black uppercase text-muted-foreground">Booking Successful</p>
                     </div>
                  </div>
               </div>
@@ -162,12 +157,16 @@ const MyBookings = () => {
                      </div>
                      <div className="flex flex-col gap-1 bg-muted/20 p-4 rounded-2xl">
                         <span className="text-[10px] font-black uppercase text-muted-foreground">Seat Allocation</span>
-                        <div className="flex items-center gap-2 mt-1">
-                           <Ticket className="h-4 w-4 text-accent" />
-                           <span className="font-bold">
-                             {foundBooking.status === 'WL' ? 'WAITLISTED' : `Coach ${foundBooking.coachId.split('-')[0]} / ${foundBooking.seatNumber} (${foundBooking.seatPosition})`}
-                           </span>
-                        </div>
+                         <div className="flex items-center gap-2 mt-1">
+                            <Ticket className="h-4 w-4 text-accent" />
+                            <div className="flex flex-wrap gap-2">
+                              {foundBooking.seats.map((s, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-[10px] font-bold bg-accent/5 text-accent border-accent/20">
+                                  {s.coachId.split('-')[1] || s.coachId} / {s.number}
+                                </Badge>
+                              ))}
+                            </div>
+                         </div>
                      </div>
                      <div className="flex flex-col gap-1 bg-muted/20 p-4 rounded-2xl">
                         <span className="text-[10px] font-black uppercase text-muted-foreground">Journey Date</span>
@@ -211,5 +210,10 @@ const MyBookings = () => {
     </div>
   );
 };
+
+export interface GlobalSettings {
+  bookingOpen: boolean;
+  lastBackup?: string;
+}
 
 export default MyBookings;

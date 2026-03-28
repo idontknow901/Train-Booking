@@ -42,17 +42,17 @@ export interface Booking {
   trainNumber: string;
   coachId: string;
   coachType: string;
-  seatNumber: number;
-  seatPosition: string;
+  seats: {
+    number: number;
+    position: string;
+    coachId: string;
+  }[];
   journeyDate: string;
   origin: string;
   destination: string;
   routeStops?: string[];
   bookedAt: string;
-  status?: string; // Legacy field for single-status checks if needed
-  initialStatus: string;  // Status at purchase (e.g. WL 5)
-  currentStatus: string;  // Dynamic status (e.g. CNF)
-  queueNumber: number;
+  status?: string; 
 }
 
 export interface GlobalSettings {

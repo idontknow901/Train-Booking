@@ -127,7 +127,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         const trainData = trainSnap.data() as Train;
         let status = 'CNF';
         const trainBookings = bookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate);
-        const bookedCount = trainBookings.length;
+        const bookedCount = trainBookings.reduce((acc, b) => acc + (b.seats?.length || 1), 0);
         
         const totalCoachConfirmed = trainData.coaches.reduce((acc, c) => acc + (c.maxConfirmed || 0), 0);
         const maxCNF = totalCoachConfirmed || 10;

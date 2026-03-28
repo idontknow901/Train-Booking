@@ -49,8 +49,12 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
 
   const totalConfirmedCapacity = train.coaches.reduce((acc, c) => acc + (c.maxConfirmed || 0), 0);
   const trainBookings = bookings.filter(b => b.trainId === train.id && b.journeyDate === (journeyDate || train.availableDate));
-  const isFull = trainBookings.length >= totalConfirmedCapacity;
-  const isWL = trainBookings.length >= totalConfirmedCapacity + (train.racLimit ?? 5);
+  
+  // REAL OCCUPIED SEAT COUNT (Sum of all seats in all bookings)
+  const totalOccupiedSeats = trainBookings.reduce((acc, b) => acc + (b.seats?.length || 1), 0);
+  
+  const isFull = totalOccupiedSeats >= totalConfirmedCapacity;
+  const isWL = totalOccupiedSeats >= totalConfirmedCapacity + (train.racLimit ?? 5);
 
   const coach = train.coaches.find(c => c.id === selectedCoach) || train.coaches[0];
   if (!coach) return <div className="p-8 text-center text-muted-foreground">No coach layout found for this train.</div>;
@@ -326,10 +330,13 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
          </div>
          <p className="text-2xl font-black text-foreground">
             {isFull ? (
-              isWL ? `AVAILABLE - 0 | WL - ${String(trainBookings.length - totalConfirmedCapacity - (train.racLimit || 5) + 1).padStart(2, '0')}` : `AVAILABLE - 0 | RAC - ${String(trainBookings.length - totalConfirmedCapacity + 1).padStart(2, '0')}`
+              isWL ? `AVAILABLE - 0 | WL - ${String(totalOccupiedSeats - totalConfirmedCapacity - (train.racLimit || 5) + 1).padStart(2, '0')}` : `AVAILABLE - 0 | RAC - ${String(totalOccupiedSeats - totalConfirmedCapacity + 1).padStart(2, '0')}`
             ) : (
-                // Coach specific availability for clarity
-              `AVAILABLE - ${String((coach.maxConfirmed || 0) - bookings.filter(b => b.trainId === train.id && b.journeyDate === (journeyDate || train.availableDate) && b.coachId === coach.id).length).padStart(4, '0')} | RAC - 00 | WL - 00`
+                // Coach specific availability correctly counting physical seats
+              `AVAILABLE - ${String((coach.maxConfirmed || 0) - bookings
+                .filter(b => b.trainId === train.id && b.journeyDate === (journeyDate || train.availableDate) && b.coachId === coach.id)
+                .reduce((acc, b) => acc + (b.seats?.length || 1), 0)
+              ).padStart(4, '0')} | RAC - 00 | WL - 00`
             )}
          </p>
       </div>

@@ -387,7 +387,7 @@ function SeatGrid({
         <div className="flex items-center justify-between p-4 rounded-2xl border border-destructive/20 bg-destructive/5">
           <div className="flex flex-col text-left">
             <span className="text-[10px] uppercase font-black text-destructive tracking-widest leading-none">Segment Status</span>
-            <span className="text-sm font-black text-destructive-foreground/70">Waitlist</span>
+            <span className="text-sm font-black text-destructive">Waitlist</span>
           </div>
           <p className="font-mono text-2xl font-black text-destructive">
              {currentWL > 0 ? `WL ${currentWL}` : 'AVAILABLE'}

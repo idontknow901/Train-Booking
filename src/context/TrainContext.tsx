@@ -163,7 +163,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
       if (trainSnap.exists()) {
         const trainData = trainSnap.data() as Train;
-        
+
         // --- Game System Architecture Integration ---
         // 1. Gather all Seat IDs on this train
         const allPhysicalSeats: { coachId: string; seat: Seat }[] = [];
@@ -171,11 +171,11 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           coach.seats.forEach(seat => allPhysicalSeats.push({ coachId: coach.id, seat }));
         });
         const physicalSeatIds = allPhysicalSeats.map(s => s.seat.id);
-        
+
         // Use a configured SoftCap of 30, and RAC Cap of 40 (meaning 10 RAC slots), these can be dynamic later
         const SOFT_CAP = 30;
         const RAC_CAP = 40;
-        
+
         const engine = new GameTrainBookingSystem(
           trainData.route.map(s => s.code),
           physicalSeatIds,
@@ -186,66 +186,66 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         // 2. Hydrate engine with existing bookings for this train
         const currentTrainBookings = bookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate);
         // Note: Sort by queue or timestamp to ensure exact reconstruction
-        const sortedBookings = currentTrainBookings.sort((a,b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
-        
+        const sortedBookings = currentTrainBookings.sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
+
         for (const existing of sortedBookings) {
-             const rCheck = engine.isValidRoute(existing.origin, existing.destination);
-             if (rCheck.valid) {
-                 engine.bookings.push({
-                     playerId: existing.username,
-                     startStation: existing.origin, endStation: existing.destination,
-                     startIndex: rCheck.startIndex, endIndex: rCheck.endIndex,
-                     status: (existing as any).status || 'CNF',
-                     seatId: existing.seatNumber ? `${existing.coachId}-${existing.seatNumber}` : null,
-                     queueNumber: (existing as any).queueNumber || 0
-                 });
-                 if (existing.seatNumber) {
-                      const realSeatId = allPhysicalSeats.find(s => s.coachId === existing.coachId && s.seat.number === existing.seatNumber)?.seat.id;
-                      if (realSeatId) {
-                          const eSeat = engine.seats.find(s => s.id === realSeatId);
-                          if (eSeat) eSeat.bookings.push(engine.bookings[engine.bookings.length - 1]);
-                      }
-                 }
-             }
+          const rCheck = engine.isValidRoute(existing.origin, existing.destination);
+          if (rCheck.valid) {
+            engine.bookings.push({
+              playerId: existing.username,
+              startStation: existing.origin, endStation: existing.destination,
+              startIndex: rCheck.startIndex, endIndex: rCheck.endIndex,
+              status: (existing as any).status || 'CNF',
+              seatId: existing.seatNumber ? `${existing.coachId}-${existing.seatNumber}` : null,
+              queueNumber: (existing as any).queueNumber || 0
+            });
+            if (existing.seatNumber) {
+              const realSeatId = allPhysicalSeats.find(s => s.coachId === existing.coachId && s.seat.number === existing.seatNumber)?.seat.id;
+              if (realSeatId) {
+                const eSeat = engine.seats.find(s => s.id === realSeatId);
+                if (eSeat) eSeat.bookings.push(engine.bookings[engine.bookings.length - 1]);
+              }
+            }
+          }
         }
 
         // 3. Request new booking status from the Engine!
         let resultTicket;
         try {
-            resultTicket = engine.bookTicket(username, origin, destination, seatId);
+          resultTicket = engine.bookTicket(username, origin, destination, seatId);
         } catch (err: any) {
-            console.error('Engine rejected booking:', err);
-            return null;
+          console.error('Engine rejected booking:', err);
+          return null;
         }
 
         // Map assigned seat ID back to coach data
         let assignedCoachId = '';
         let assignedSeatNumber = 0;
         let assignedSeatPosition = 'Pending';
-        
+
         if (resultTicket.seatId) {
-             const seatData = allPhysicalSeats.find(s => s.seat.id === resultTicket.seatId);
-             if (seatData) {
-                 assignedCoachId = seatData.coachId;
-                 assignedSeatNumber = seatData.seat.number;
-                 assignedSeatPosition = seatData.seat.position;
-             }
+          const seatData = allPhysicalSeats.find(s => s.seat.id === resultTicket.seatId);
+          if (seatData) {
+            assignedCoachId = seatData.coachId;
+            assignedSeatNumber = seatData.seat.number;
+            assignedSeatPosition = seatData.seat.position;
+          }
         }
 
         // 4. Update the specific selected physical seat if CNF was achieved
         // We no longer rely strictly on "isBooked" blocking segment reuse! We can reuse if engine allowed it.
         const updatedCoaches = trainData.coaches.map(coach => {
           if (resultTicket.status === 'CNF' && coach.id === assignedCoachId) {
-             return {
-               ...coach,
-               seats: coach.seats.map(seat => {
-                 if (seat.number === assignedSeatNumber) {
-                    // Just updating local property for easy UI rendering, but true truth is in engine 
-                    return { ...seat, isBooked: true, bookedBy: username, pnr };
-                 }
-                 return seat;
-               })
-             };
+            return {
+              ...coach,
+              seats: coach.seats.map(seat => {
+                if (seat.number === assignedSeatNumber) {
+                  // Just updating local property for easy UI rendering, but true truth is in engine 
+                  return { ...seat, isBooked: true, bookedBy: username, pnr };
+                }
+                return seat;
+              })
+            };
           }
           return coach;
         });
@@ -274,7 +274,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
         await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
         await withTimeout(setDoc(doc(db, 'bookings', pnr), newBooking), 'Saving booking');
-        
+
         // Send Discord Webhook notification
         try {
           const { sendBookingWebhook } = await import('@/lib/discord');

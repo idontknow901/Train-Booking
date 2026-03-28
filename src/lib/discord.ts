@@ -17,7 +17,7 @@ export async function sendBookingWebhook(booking: Booking) {
     fields: [
       {
         name: '🚥 Status',
-        value: `**${booking.status === 'CNF' ? 'Confirmed (CNF)' : `${booking.status} / W/L ${booking.queueNumber}`}**`,
+        value: `**${booking.status === 'CNF' ? 'Confirmed (CNF)' : `${booking.status} / ${booking.queueNumber}`}**`,
         inline: false,
       },
       {

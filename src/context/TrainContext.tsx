@@ -13,7 +13,8 @@ import {
   getDocs,
   writeBatch
 } from 'firebase/firestore';
-import { Train, Booking, GlobalSettings, Station } from '@/types/train';
+import { Train, Booking, GlobalSettings, Station, Seat } from '@/types/train';
+import { GameTrainBookingSystem } from '@/lib/bookingEngine';
 
 interface TrainContextType {
   trains: Train[];
@@ -22,7 +23,7 @@ interface TrainContextType {
   stations: Station[];
   addTrain: (train: Train) => Promise<void>;
   removeTrain: (trainId: string) => Promise<void>;
-  bookSeat: (trainId: string, coachId: string, seatId: string, username: string, journeyDate: string, origin: string, destination: string) => Promise<Booking | null>;
+  bookSeat: (trainId: string, coachId: string | null, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string) => Promise<Booking | null>;
   resetAllSeats: () => Promise<void>;
   toggleBooking: () => Promise<void>;
   getTrainsByRoute: (origin: string, destination: string, date?: string) => Train[];
@@ -148,7 +149,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     await withTimeout(deleteDoc(doc(db, 'stations', code)), 'Removing station');
   }, []);
 
-  const bookSeat = useCallback(async (trainId: string, coachId: string, seatId: string, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
+  const bookSeat = useCallback(async (trainId: string, coachId: string | null, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
     if (!settings.bookingOpen) return null;
 
     try {
@@ -162,45 +163,122 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
       if (trainSnap.exists()) {
         const trainData = trainSnap.data() as Train;
+        
+        // --- Game System Architecture Integration ---
+        // 1. Gather all Seat IDs on this train
+        const allPhysicalSeats: { coachId: string; seat: Seat }[] = [];
+        trainData.coaches.forEach(coach => {
+          coach.seats.forEach(seat => allPhysicalSeats.push({ coachId: coach.id, seat }));
+        });
+        const physicalSeatIds = allPhysicalSeats.map(s => s.seat.id);
+        
+        // Use a configured SoftCap of 30, and RAC Cap of 40 (meaning 10 RAC slots), these can be dynamic later
+        const SOFT_CAP = 30;
+        const RAC_CAP = 40;
+        
+        const engine = new GameTrainBookingSystem(
+          trainData.route.map(s => s.code),
+          physicalSeatIds,
+          SOFT_CAP,
+          RAC_CAP
+        );
+
+        // 2. Hydrate engine with existing bookings for this train
+        const currentTrainBookings = bookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate);
+        // Note: Sort by queue or timestamp to ensure exact reconstruction
+        const sortedBookings = currentTrainBookings.sort((a,b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
+        
+        for (const existing of sortedBookings) {
+             const rCheck = engine.isValidRoute(existing.origin, existing.destination);
+             if (rCheck.valid) {
+                 engine.bookings.push({
+                     playerId: existing.username,
+                     startStation: existing.origin, endStation: existing.destination,
+                     startIndex: rCheck.startIndex, endIndex: rCheck.endIndex,
+                     status: (existing as any).status || 'CNF',
+                     seatId: existing.seatNumber ? `${existing.coachId}-${existing.seatNumber}` : null,
+                     queueNumber: (existing as any).queueNumber || 0
+                 });
+                 if (existing.seatNumber) {
+                      const realSeatId = allPhysicalSeats.find(s => s.coachId === existing.coachId && s.seat.number === existing.seatNumber)?.seat.id;
+                      if (realSeatId) {
+                          const eSeat = engine.seats.find(s => s.id === realSeatId);
+                          if (eSeat) eSeat.bookings.push(engine.bookings[engine.bookings.length - 1]);
+                      }
+                 }
+             }
+        }
+
+        // 3. Request new booking status from the Engine!
+        let resultTicket;
+        try {
+            resultTicket = engine.bookTicket(username, origin, destination);
+        } catch (err: any) {
+            console.error('Engine rejected booking:', err);
+            return null;
+        }
+
+        // Map assigned seat ID back to coach data
+        let assignedCoachId = '';
+        let assignedSeatNumber = 0;
+        let assignedSeatPosition = 'Pending';
+        
+        if (resultTicket.seatId) {
+             const seatData = allPhysicalSeats.find(s => s.seat.id === resultTicket.seatId);
+             if (seatData) {
+                 assignedCoachId = seatData.coachId;
+                 assignedSeatNumber = seatData.seat.number;
+                 assignedSeatPosition = seatData.seat.position;
+             }
+        }
+
+        // 4. Update the specific selected physical seat if CNF was achieved
+        // We no longer rely strictly on "isBooked" blocking segment reuse! We can reuse if engine allowed it.
         const updatedCoaches = trainData.coaches.map(coach => {
-          if (coach.id !== coachId) return coach;
-          return {
-            ...coach,
-            seats: coach.seats.map(seat => {
-              if (seat.id !== seatId || seat.isBooked) return seat;
-              booking = {
-                pnr,
-                username,
-                trainId,
-                trainName: trainData.name,
-                trainNumber: trainData.number,
-                coachId: coach.id,
-                seatNumber: seat.number,
-                seatPosition: seat.position,
-                journeyDate,
-                origin,
-                destination,
-                bookedAt: new Date().toISOString(),
-              };
-              return { ...seat, isBooked: true, bookedBy: username, pnr };
-            }),
-          };
+          if (resultTicket.status === 'CNF' && coach.id === assignedCoachId) {
+             return {
+               ...coach,
+               seats: coach.seats.map(seat => {
+                 if (seat.number === assignedSeatNumber) {
+                    // Just updating local property for easy UI rendering, but true truth is in engine 
+                    return { ...seat, isBooked: true, bookedBy: username, pnr };
+                 }
+                 return seat;
+               })
+             };
+          }
+          return coach;
         });
 
-        if (booking) {
-          await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
-          await withTimeout(setDoc(doc(db, 'bookings', pnr), booking), 'Saving booking');
-          
-          // Send Discord Webhook notification
-          try {
-            const { sendBookingWebhook } = await import('@/lib/discord');
-            sendBookingWebhook(booking);
-          } catch (error) {
-            console.error('Failed to trigger Discord webhook:', error);
-          }
+        const newBooking = {
+          pnr,
+          username,
+          trainId,
+          trainName: trainData.name,
+          trainNumber: trainData.number,
+          coachId: assignedCoachId || coachId || '',
+          seatNumber: assignedSeatNumber,
+          seatPosition: assignedSeatPosition,
+          journeyDate,
+          origin,
+          destination,
+          bookedAt: new Date().toISOString(),
+          status: resultTicket.status,
+          queueNumber: resultTicket.queueNumber
+        } as unknown as Booking;
 
-          return booking;
+        await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
+        await withTimeout(setDoc(doc(db, 'bookings', pnr), newBooking), 'Saving booking');
+        
+        // Send Discord Webhook notification
+        try {
+          const { sendBookingWebhook } = await import('@/lib/discord');
+          sendBookingWebhook(newBooking);
+        } catch (error) {
+          console.error('Failed to trigger Discord webhook:', error);
         }
+
+        return newBooking;
       }
     } catch (e: any) {
       const errCode = e.code ? `(${e.code})` : '';

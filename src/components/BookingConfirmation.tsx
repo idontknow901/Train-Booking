@@ -66,7 +66,9 @@ export default function BookingConfirmation({ booking, onClose }: BookingConfirm
           >
             <CheckCircle className="mx-auto mb-3 h-16 w-16 text-emerald-500" />
           </motion.div>
-          <h2 className="text-2xl font-bold">Ticket Confirmed!</h2>
+          <h2 className="text-2xl font-bold">
+            {booking.status === 'CNF' ? 'Ticket Confirmed!' : booking.status === 'RAC' ? 'Ticket RAC' : 'Waitlisted (WL)'}
+          </h2>
         </div>
 
         <div className="mb-6 rounded-lg bg-muted p-4">
@@ -82,10 +84,11 @@ export default function BookingConfirmation({ booking, onClose }: BookingConfirm
 
         <div className="space-y-2.5 text-sm font-medium">
           {[
+            ['Status', booking.status === 'CNF' ? 'Confirmed (CNF)' : `${booking.status} ${booking.queueNumber}`],
             ['Passenger', booking.username],
             ['Train', `${booking.trainName} (#${booking.trainNumber})`],
             ['Route', `${booking.origin} → ${booking.destination}`],
-            ['Coach / Seat', `${booking.coachId.split('-')[0]} / Seat ${booking.seatNumber} (${booking.seatPosition})`],
+            ['Coach / Seat', booking.status === 'WL' ? 'Not Assigned' : `${booking.coachId.split('-')[0] || 'Pending'} / Seat ${booking.seatNumber || 'Pending'} (${booking.seatPosition || 'Pending'})`],
             ['Journey Date', booking.journeyDate],
           ].map(([label, value]) => (
             <div key={label} className="flex justify-between border-b border-border/50 pb-2">

@@ -8,10 +8,18 @@ export async function sendBookingWebhook(booking: Booking) {
     return;
   }
 
+  const titleSuffix = booking.status === 'CNF' ? 'Confirmed' : booking.status === 'RAC' ? 'RAC Assigned' : 'Waitlisted';
+  const color = booking.status === 'CNF' ? 0x10b981 : booking.status === 'RAC' ? 0xf59e0b : 0xef4444; // Green, Yellow, Red
+
   const embed = {
-    title: '🚂 New Train Booking Confirmed!',
-    color: 0x3b82f6, // Blue color
+    title: `🚂 New Train Booking ${titleSuffix}!`,
+    color: color,
     fields: [
+      {
+        name: '🚥 Status',
+        value: `**${booking.status === 'CNF' ? 'Confirmed (CNF)' : `${booking.status} / W/L ${booking.queueNumber}`}**`,
+        inline: false,
+      },
       {
         name: '👤 Passenger',
         value: `\`${booking.username}\``,
@@ -34,7 +42,7 @@ export async function sendBookingWebhook(booking: Booking) {
       },
       {
         name: '💺 Seat Info',
-        value: `Coach: ${booking.coachId.split('-')[0]} | Seat: ${booking.seatNumber} (${booking.seatPosition})`,
+        value: booking.status === 'WL' ? 'Not Assigned' : `Coach: ${booking.coachId.split('-')[0] || 'Pending'} | Seat: ${booking.seatNumber || 'Pending'} (${booking.seatPosition || 'Pending'})`,
         inline: true,
       },
       {

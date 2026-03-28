@@ -43,6 +43,8 @@ export interface Booking {
   origin: string;
   destination: string;
   bookedAt: string;
+  status?: string;
+  queueNumber?: number;
 }
 
 export interface GlobalSettings {

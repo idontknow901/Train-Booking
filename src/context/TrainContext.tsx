@@ -32,6 +32,7 @@ interface TrainContextType {
   clearAllTrains: () => Promise<void>;
   clearAllStations: () => Promise<void>;
   clearAllBookings: () => Promise<void>;
+  cancelBooking: (pnr: string) => Promise<void>;
 }
 
 const TrainContext = createContext<TrainContextType | null>(null);
@@ -293,6 +294,16 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
     return null;
   }, [settings.bookingOpen, bookings]);
+ 
+  const cancelBooking = useCallback(async (pnr: string) => {
+    try {
+      await withTimeout(deleteDoc(doc(db, 'bookings', pnr)), 'Cancelling booking');
+      console.log('Ticket cancelled:', pnr);
+    } catch (e) {
+      console.error('Cancel error:', e);
+      throw e;
+    }
+  }, []);
 
   const resetAllSeats = useCallback(async () => {
     try {
@@ -376,7 +387,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       trains, bookings, settings, stations,
       addTrain, removeTrain, bookSeat, resetAllSeats,
       toggleBooking, getTrainsByRoute, addStation, removeStation,
-      clearAllTrains, clearAllStations, clearAllBookings
+      clearAllTrains, clearAllStations, clearAllBookings, cancelBooking
     }}>
       {children}
     </TrainContext.Provider>

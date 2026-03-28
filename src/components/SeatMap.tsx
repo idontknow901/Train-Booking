@@ -88,6 +88,13 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
 
     setIsBooking(true);
 
+    const userBookingsCount = bookings.filter(b => b.username === username.trim() && b.trainId === train.id && b.journeyDate === journeyDate).length;
+    if (userBookingsCount >= 4) {
+      toast.error('Maximum limit of 4 seats per train reached.');
+      setIsBooking(false);
+      return;
+    }
+
     try {
       const booking = await bookSeat(
           train.id, 
@@ -162,7 +169,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
 
           <div className="flex items-center gap-2 bg-background p-1.5 rounded-2xl border border-border shadow-inner">
              <Select value={selectedOrigin} onValueChange={(v) => { setSelectedOrigin(v); setSelectedSeat(null); }}>
-                 <SelectTrigger className="h-10 text-xs font-black border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
+                 <SelectTrigger className="h-10 text-xs font-medium border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
                  <SelectContent>
                      {train.route.map((s, idx) => (
                          <SelectItem key={s.code} value={s.code} disabled={idx >= train.route.findIndex(x => x.code === selectedDest)}>{s.name} ({s.code})</SelectItem>
@@ -171,7 +178,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
              </Select>
              <div className="h-8 w-px bg-border mx-1" />
              <Select value={selectedDest} onValueChange={(v) => { setSelectedDest(v); setSelectedSeat(null); }}>
-                 <SelectTrigger className="h-10 text-xs font-black border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
+                 <SelectTrigger className="h-10 text-xs font-medium border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
                  <SelectContent>
                      {train.route.map((s, idx) => (
                          <SelectItem key={s.code} value={s.code} disabled={idx <= train.route.findIndex(x => x.code === selectedOrigin)}>{s.name} ({s.code})</SelectItem>
@@ -237,6 +244,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
               selectedSeat={selectedSeat} 
               onSelectSeat={s => setSelectedSeat(s.id === selectedSeat?.id ? null : s)} 
               engine={engine}
+              train={train}
               selectedOrigin={selectedOrigin}
               selectedDest={selectedDest}
             />
@@ -294,6 +302,7 @@ function SeatGrid({
   selectedSeat, 
   onSelectSeat, 
   engine, 
+  train,
   selectedOrigin, 
   selectedDest 
 }: { 
@@ -301,19 +310,33 @@ function SeatGrid({
   selectedSeat: Seat | null; 
   onSelectSeat: (s: Seat) => void;
   engine: GameTrainBookingSystem;
+  train: Train;
   selectedOrigin: string;
   selectedDest: string;
 }) {
   const cols = 8;
   const rCheck = engine.isValidRoute(selectedOrigin, selectedDest);
   
-  // Calculate Segmented Stats from actual engine bookings
-  const segmentBookings = engine.bookings.filter(b => 
-    GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
-  );
+  // Calculate Segmented Stats from actual engine bookings for THIS coach type
+  const segmentBookings = engine.bookings.filter(b => {
+    const isOverlapping = GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex);
+    // Find waitlisted/RAC bookings for this specific coach type if they don't have a seat assigned yet
+    // or if they are assigned to this coach ID
+    const bookingCoachId = b.seatId?.split('-')[0] + '-' + b.seatId?.split('-')[1]; // Reconstruction of coachId
+    const isThisCoach = b.seatId && bookingCoachId === coach.id;
+    return isOverlapping && isThisCoach;
+  });
   
-  const currentRAC = segmentBookings.filter(b => b.status === 'RAC').length;
-  const currentWL = segmentBookings.filter(b => b.status === 'WL').length;
+  // Wait, in real-life RAC/WL is pooled by class (3A, SL, etc.)
+  const classBookings = engine.bookings.filter(b => {
+      const isOverlapping = GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex);
+      // Infer coach type from seatId if assigned, or if they are in the virtual queue for this class
+      const assignedCoach = train.coaches.find(c => c.id === b.seatId?.split('-').slice(0, 2).join('-'));
+      return isOverlapping && (assignedCoach?.type === coach.type);
+  });
+
+  const currentRAC = classBookings.filter(b => b.status === 'RAC').length;
+  const currentWL = classBookings.filter(b => b.status === 'WL').length;
 
   return (
     <div className="space-y-4">
@@ -345,8 +368,8 @@ function SeatGrid({
                 disabled={isUnavailable}
                 title={`${seat.number} - ${seat.position}${isOccupied ? ` (Booked for this segment)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
               >
-                <span className="text-2xl font-bold tracking-tighter">{displayStatus}</span>
-                {!isUnavailable && <span className="text-xs uppercase font-medium opacity-80 tracking-widest mt-0.5">{seat.position}</span>}
+                <span className="text-lg font-medium tracking-tighter opacity-80">{displayStatus}</span>
+                {!isUnavailable && <span className="text-[10px] uppercase font-black tracking-widest mt-1 text-accent leading-none">{seat.position}</span>}
               </button>
             );
           })}

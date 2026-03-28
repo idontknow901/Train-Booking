@@ -171,36 +171,64 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
         </div>
       )}
 
-      {/* Multi-Stop Timeline UI */}
-      <div className="rounded-xl border border-border bg-card p-5 overflow-hidden">
-        <h3 className="mb-4 font-bold text-foreground text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          <MapPin className="h-4 w-4" /> Journey Timeline (Click to Select)
-        </h3>
-        <div className="relative flex items-center justify-between before:absolute before:left-0 before:right-0 before:h-0.5 before:bg-muted before:top-1/2 before:-translate-y-1/2 before:z-0">
-           {train.route.map((stop, idx) => {
-              const isOrigin = stop.code === selectedOrigin;
-              const isDest = stop.code === selectedDest;
-              const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
-              const destIdx = train.route.findIndex(s => s.code === selectedDest);
-              
-              let dotColor = 'bg-muted border-border';
-              if (idx >= originIdx && idx <= destIdx) dotColor = 'bg-accent border-accent';
+      {/* Journey Configuration Header */}
+      <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-6 shadow-xl space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent flex items-center gap-2">
+              <MapPin className="h-3 w-3" /> Journey Configuration
+            </h3>
+            <p className="text-sm text-muted-foreground font-medium">Customize your boarding and destination stations below</p>
+          </div>
 
-              return (
-                <button 
-                  key={stop.code} 
-                  onClick={() => handleTimelineClick(stop.code)}
-                  className="relative z-10 flex flex-col items-center gap-2 group cursor-pointer"
-                >
-                  <div className={`h-4 w-4 rounded-full border-2 ${dotColor} flex items-center justify-center transition-all ${isOrigin || isDest ? 'scale-125 ring-4 ring-accent/20' : 'group-hover:scale-110'}`} />
-                  <div className="absolute top-6 flex flex-col items-center">
-                    <span className={`text-[10px] uppercase font-bold whitespace-nowrap ${isOrigin || isDest ? 'text-accent' : 'text-muted-foreground'}`}>{stop.code}</span>
-                  </div>
-                </button>
-              );
-           })}
+          <div className="flex items-center gap-2 bg-background p-1.5 rounded-2xl border border-border shadow-inner">
+             <Select value={selectedOrigin} onValueChange={(v) => { setSelectedOrigin(v); setSelectedSeat(null); }}>
+                 <SelectTrigger className="h-10 text-xs font-black border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
+                 <SelectContent>
+                     {train.route.map((s, idx) => (
+                         <SelectItem key={s.code} value={s.code} disabled={idx >= train.route.findIndex(x => x.code === selectedDest)}>{s.name} ({s.code})</SelectItem>
+                     ))}
+                 </SelectContent>
+             </Select>
+             <div className="h-8 w-px bg-border mx-1" />
+             <Select value={selectedDest} onValueChange={(v) => { setSelectedDest(v); setSelectedSeat(null); }}>
+                 <SelectTrigger className="h-10 text-xs font-black border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
+                 <SelectContent>
+                     {train.route.map((s, idx) => (
+                         <SelectItem key={s.code} value={s.code} disabled={idx <= train.route.findIndex(x => x.code === selectedOrigin)}>{s.name} ({s.code})</SelectItem>
+                     ))}
+                 </SelectContent>
+             </Select>
+          </div>
         </div>
-        <div className="h-6" /> {/* spacer */}
+
+        {/* Multi-Stop Timeline UI */}
+        <div className="relative pt-2 pb-6 px-4">
+          <div className="relative flex items-center justify-between before:absolute before:left-0 before:right-0 before:h-1 before:bg-muted before:top-1/2 before:-translate-y-1/2 before:z-0">
+             {train.route.map((stop, idx) => {
+                const isOrigin = stop.code === selectedOrigin;
+                const isDest = stop.code === selectedDest;
+                const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
+                const destIdx = train.route.findIndex(s => s.code === selectedDest);
+                
+                let dotColor = 'bg-muted border-border';
+                if (idx >= originIdx && idx <= destIdx) dotColor = 'bg-accent border-accent ring-4 ring-accent/10';
+
+                return (
+                  <button 
+                    key={stop.code} 
+                    onClick={() => handleTimelineClick(stop.code)}
+                    className="relative z-10 flex flex-col items-center group"
+                  >
+                    <div className={`h-5 w-5 rounded-full border-2 ${dotColor} flex items-center justify-center transition-all duration-300 ${isOrigin || isDest ? 'scale-125 ring-8 ring-accent/20 bg-background' : 'group-hover:scale-125 bg-muted'}`} />
+                    <div className="absolute top-8 flex flex-col items-center">
+                      <span className={`text-[10px] uppercase font-black tracking-widest whitespace-nowrap transition-colors ${isOrigin || isDest ? 'text-accent' : 'text-muted-foreground group-hover:text-foreground'}`}>{stop.code}</span>
+                    </div>
+                  </button>
+                );
+             })}
+          </div>
+        </div>
       </div>
 
       <Tabs value={selectedCoach} onValueChange={v => { setSelectedCoach(v); setSelectedSeat(null); }}>
@@ -334,13 +362,13 @@ function SeatGrid({
             return (
               <button
                 key={seat.id}
-                className={`flex flex-col h-14 w-full items-center justify-center rounded-xl border transition-all duration-200 ${cls} ${isUnavailable ? 'opacity-40' : ''}`}
+                className={`flex flex-col h-20 w-full items-center justify-center rounded-2xl border-2 transition-all duration-300 ${cls} ${isUnavailable ? 'opacity-30' : 'shadow-sm active:scale-95'}`}
                 onClick={() => !isUnavailable && onSelectSeat(seat)}
                 disabled={isUnavailable}
                 title={`${seat.number} - ${seat.position}${isOccupied ? ` (Booked for this segment)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
               >
-                <span className="text-xs font-mono font-black">{displayStatus}</span>
-                {!isUnavailable && <span className="text-[8px] uppercase font-bold opacity-60 tracking-widest">{displaySub}</span>}
+                <span className="text-2xl font-black tracking-tighter">{displayStatus}</span>
+                {!isUnavailable && <span className="text-[10px] uppercase font-black opacity-60 tracking-[0.1em] mt-0.5">{seat.position}</span>}
               </button>
             );
           })}

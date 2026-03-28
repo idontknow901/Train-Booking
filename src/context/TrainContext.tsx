@@ -278,7 +278,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         // Send Discord Webhook notification
         try {
           const { sendBookingWebhook } = await import('@/lib/discord');
-          sendBookingWebhook(newBooking);
+          sendBookingWebhook(newBooking, trainData);
         } catch (error) {
           console.error('Failed to trigger Discord webhook:', error);
         }

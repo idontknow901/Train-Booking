@@ -1,16 +1,16 @@
-import { Booking } from '@/types/train';
-
+import { Booking, Train } from '@/types/train';
+ 
 const DISCORD_WEBHOOK_URL = import.meta.env.VITE_DISCORD_WEBHOOK_URL;
-
-export async function sendBookingWebhook(booking: Booking) {
+ 
+export async function sendBookingWebhook(booking: Booking, train: Train) {
   if (!DISCORD_WEBHOOK_URL) {
     console.warn('Discord webhook URL not found in environment variables');
     return;
   }
-
+ 
   const titleSuffix = booking.status === 'CNF' ? 'Confirmed' : booking.status === 'RAC' ? 'RAC Assigned' : 'Waitlisted';
   const color = booking.status === 'CNF' ? 0x10b981 : booking.status === 'RAC' ? 0xf59e0b : 0xef4444; // Green, Yellow, Red
-
+ 
   const embed = {
     title: `🚂 New Train Booking ${titleSuffix}!`,
     color: color,
@@ -36,8 +36,20 @@ export async function sendBookingWebhook(booking: Booking) {
         inline: false,
       },
       {
-        name: '📍 Route',
-        value: booking.routeStops?.length ? booking.routeStops.join(' ➔ ') : `${booking.origin} → ${booking.destination}`,
+        name: '📍 Train Route',
+        value: `**${train.route[0].name}** ➔ **${train.route[train.route.length - 1].name}**`,
+        inline: false,
+      },
+      {
+        name: '🛫 Boarding & 🛬 Leaving',
+        value: `Boarding: \`${booking.origin}\`\nLeaving: \`${booking.destination}\``,
+        inline: true,
+      },
+      {
+        name: '🛤️ Intermediate Stops',
+        value: booking.routeStops?.length && booking.routeStops.length > 2 
+          ? `\`${booking.routeStops.slice(1, -1).join(' -> ')}\``
+          : '*No intermediate stops*',
         inline: false,
       },
       {
@@ -61,7 +73,7 @@ export async function sendBookingWebhook(booking: Booking) {
     },
     timestamp: new Date().toISOString(),
   };
-
+ 
   try {
     const response = await fetch(DISCORD_WEBHOOK_URL, {
       method: 'POST',
@@ -72,7 +84,7 @@ export async function sendBookingWebhook(booking: Booking) {
         embeds: [embed],
       }),
     });
-
+ 
     if (!response.ok) {
       console.error('Failed to send Discord webhook:', await response.text());
     }

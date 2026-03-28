@@ -21,18 +21,23 @@ import {
   Ticket, 
   User, 
   Loader2, 
-  MapPin 
+  MapPin,
+  ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SeatMapProps {
   train: Train;
+  onBack: () => void;
+  origin: string;
+  destination: string;
+  journeyDate: string;
 }
 
-export function SeatMap({ train }: SeatMapProps) {
+export function SeatMap({ train, onBack, origin, destination, journeyDate }: SeatMapProps) {
   const { bookSeat, bookings, settings } = useTrainContext();
-  const [selectedOrigin, setSelectedOrigin] = useState(train.route[0].code);
-  const [selectedDest, setSelectedDest] = useState(train.route[train.route.length - 1].code);
+  const [selectedOrigin, setSelectedOrigin] = useState(origin || train.route[0].code);
+  const [selectedDest, setSelectedDest] = useState(destination || train.route[train.route.length - 1].code);
   const [selectedCoach, setSelectedCoach] = useState(train.coaches[0].id);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [username, setUsername] = useState('');
@@ -117,7 +122,18 @@ export function SeatMap({ train }: SeatMapProps) {
   };
 
   return (
-    <div className="space-y-6 pb-32">
+    <div className="space-y-6 pb-32 animate-in fade-in duration-500">
+      <div className="flex items-center gap-4 mb-4">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={onBack}
+          className="rounded-xl border-border bg-card/50 backdrop-blur-sm shadow-sm md:flex hidden"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back To Search
+        </Button>
+      </div>
+
       {/* Reverted Journey Configuration Box */}
       <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-6 shadow-xl space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

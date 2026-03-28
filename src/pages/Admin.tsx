@@ -202,7 +202,7 @@ function PassengerList({ bookings, onClearAll }: { bookings: Booking[], onClearA
                   <td className="px-6 py-4 font-bold text-foreground">{b.username}</td>
                   <td className="px-6 py-4 text-foreground">{b.trainName} <span className="text-[10px] opacity-50 ml-1">#{b.trainNumber}</span></td>
                   <td className="px-6 py-4 font-mono text-foreground text-xs">
-                    {b.coachId.split('-')[1] || b.coachId} / {b.seats.map(s => `#${s.number}`).join(', ')}
+                    {b.coachId?.split('-')[0]} / {b.seats ? b.seats.map(s => `#${s.number}`).join(', ') : `#${(b as any).seatNumber || 'N/A'}`}
                   </td>
                   <td className="px-6 py-4 text-foreground font-medium">{b.origin} → {b.destination}</td>
                   <td className="px-6 py-4 text-muted-foreground text-xs">{b.journeyDate}</td>

@@ -133,6 +133,24 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
           <h2 className="text-2xl font-black text-foreground mb-6">Ticket Confirmed!</h2>
           
           <div className="bg-muted/30 rounded-xl p-6 border border-border/50 relative mb-6">
+            <div className="relative pt-2 pb-6 px-4 flex items-center justify-between before:absolute before:left-8 before:right-8 before:h-[2px] before:bg-border before:top-[1.25rem] before:z-0">
+           {train.route.map((stop, idx) => {
+              const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
+              const destIdx = train.route.findIndex(s => s.code === selectedDest);
+              const isActive = idx >= originIdx && idx <= destIdx;
+
+              return (
+                <button 
+                  key={stop.code}
+                  onClick={() => handleTimelineClick(stop.code)}
+                  className="relative z-10 flex flex-col items-center gap-2 group transition-all"
+                >
+                  <div className={`h-4 w-4 rounded-full border-2 transition-all ${isActive ? 'bg-accent border-accent scale-110 shadow-lg shadow-accent/20' : 'bg-background border-border group-hover:border-accent/50'}`} />
+                  <span className={`text-[10px] font-black tracking-widest uppercase transition-colors whitespace-nowrap ${isActive ? 'text-accent' : 'text-muted-foreground/40'}`}>{stop.name}</span>
+                </button>
+              );
+           })}
+            </div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">PNR Number</span>
               <button 
@@ -235,6 +253,25 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
              </Select>
           </div>
         </div>
+
+        <div className="relative pt-6 pb-2 px-8 flex items-center justify-between before:absolute before:left-14 before:right-14 before:h-[2px] before:bg-border before:top-[2.25rem] before:z-0 overflow-x-auto scrollbar-hide">
+           {train.route.map((stop, idx) => {
+              const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
+              const destIdx = train.route.findIndex(s => s.code === selectedDest);
+              const isActive = idx >= originIdx && idx <= destIdx;
+
+              return (
+                <button 
+                  key={stop.code}
+                  onClick={() => handleTimelineClick(stop.code)}
+                  className="relative z-10 flex flex-col items-center gap-3 min-w-[100px] group transition-all"
+                >
+                  <div className={`h-5 w-5 rounded-full border-2 transition-all ${isActive ? 'bg-accent border-accent scale-110 shadow-lg shadow-accent/20' : 'bg-background border-border group-hover:border-accent/40'}`} />
+                  <span className={`text-[10px] font-black tracking-widest uppercase transition-colors whitespace-nowrap ${isActive ? 'text-accent' : 'text-muted-foreground/40'}`}>{stop.name}</span>
+                </button>
+              );
+           })}
+        </div>
       </div>
 
       <Tabs value={selectedCoach} onValueChange={v => { setSelectedCoach(v); setSelectedSeats([]); }}>
@@ -291,7 +328,8 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
             {isFull ? (
               isWL ? `AVAILABLE - 0 | WL - ${String(trainBookings.length - totalConfirmedCapacity - (train.racLimit || 5) + 1).padStart(2, '0')}` : `AVAILABLE - 0 | RAC - ${String(trainBookings.length - totalConfirmedCapacity + 1).padStart(2, '0')}`
             ) : (
-              `AVAILABLE - ${String(totalConfirmedCapacity - trainBookings.length).padStart(4, '0')} | RAC - 00 | WL - 00`
+                // Coach specific availability for clarity
+              `AVAILABLE - ${String((coach.maxConfirmed || 0) - bookings.filter(b => b.trainId === train.id && b.journeyDate === (journeyDate || train.availableDate) && b.coachId === coach.id).length).padStart(4, '0')} | RAC - 00 | WL - 00`
             )}
          </p>
       </div>

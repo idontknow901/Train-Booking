@@ -23,7 +23,7 @@ interface TrainContextType {
   stations: Station[];
   addTrain: (train: Train) => Promise<void>;
   removeTrain: (trainId: string) => Promise<void>;
-  bookSeat: (trainId: string, coachId: string | null, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string) => Promise<Booking | null>;
+  bookSeat: (trainId: string, coachId: string | null, coachType: string, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string) => Promise<Booking | null>;
   resetAllSeats: () => Promise<void>;
   toggleBooking: () => Promise<void>;
   getTrainsByRoute: (origin: string, destination: string, date?: string) => Train[];
@@ -150,7 +150,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     await withTimeout(deleteDoc(doc(db, 'stations', code)), 'Removing station');
   }, []);
 
-  const bookSeat = useCallback(async (trainId: string, coachId: string | null, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
+  const bookSeat = useCallback(async (trainId: string, coachId: string | null, coachType: string, seatId: string | null, username: string, journeyDate: string, origin: string, destination: string): Promise<Booking | null> => {
     if (!settings.bookingOpen) return null;
 
     try {
@@ -262,6 +262,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           trainName: trainData.name,
           trainNumber: trainData.number,
           coachId: assignedCoachId || coachId || '',
+          coachType: coachType,
           seatNumber: assignedSeatNumber,
           seatPosition: assignedSeatPosition,
           journeyDate,

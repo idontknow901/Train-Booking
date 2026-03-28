@@ -98,8 +98,9 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
     try {
       const booking = await bookSeat(
           train.id, 
-          selectedSeat ? selectedCoach : null, 
-          selectedSeat ? selectedSeat.id : null, 
+          selectedCoach, 
+          coach.type,
+          selectedSeat?.id || null, 
           username.trim(), 
           journeyDate, 
           selectedOrigin, 
@@ -245,6 +246,8 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
               onSelectSeat={s => setSelectedSeat(s.id === selectedSeat?.id ? null : s)} 
               engine={engine}
               train={train}
+              bookings={bookings}
+              journeyDate={journeyDate}
               selectedOrigin={selectedOrigin}
               selectedDest={selectedDest}
             />
@@ -303,6 +306,8 @@ function SeatGrid({
   onSelectSeat, 
   engine, 
   train,
+  bookings,
+  journeyDate,
   selectedOrigin, 
   selectedDest 
 }: { 
@@ -311,6 +316,8 @@ function SeatGrid({
   onSelectSeat: (s: Seat) => void;
   engine: GameTrainBookingSystem;
   train: Train;
+  bookings: Booking[];
+  journeyDate: string;
   selectedOrigin: string;
   selectedDest: string;
 }) {
@@ -318,21 +325,12 @@ function SeatGrid({
   const rCheck = engine.isValidRoute(selectedOrigin, selectedDest);
   
   // Calculate Segmented Stats from actual engine bookings for THIS coach type
-  const segmentBookings = engine.bookings.filter(b => {
-    const isOverlapping = GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex);
-    // Find waitlisted/RAC bookings for this specific coach type if they don't have a seat assigned yet
-    // or if they are assigned to this coach ID
-    const bookingCoachId = b.seatId?.split('-')[0] + '-' + b.seatId?.split('-')[1]; // Reconstruction of coachId
-    const isThisCoach = b.seatId && bookingCoachId === coach.id;
-    return isOverlapping && isThisCoach;
-  });
-  
-  // Wait, in real-life RAC/WL is pooled by class (3A, SL, etc.)
-  const classBookings = engine.bookings.filter(b => {
-      const isOverlapping = GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex);
-      // Infer coach type from seatId if assigned, or if they are in the virtual queue for this class
-      const assignedCoach = train.coaches.find(c => c.id === b.seatId?.split('-').slice(0, 2).join('-'));
-      return isOverlapping && (assignedCoach?.type === coach.type);
+  const classBookings = bookings.filter(b => {
+      if (b.trainId !== train.id || b.journeyDate !== journeyDate) return false;
+      const bRoute = engine.isValidRoute(b.origin, b.destination);
+      if (!bRoute.valid) return false;
+      const isOverlapping = GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, bRoute.startIndex, bRoute.endIndex);
+      return isOverlapping && b.coachType === coach.type;
   });
 
   const currentRAC = classBookings.filter(b => b.status === 'RAC').length;

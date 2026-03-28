@@ -39,6 +39,7 @@ export interface Booking {
   trainName: string;
   trainNumber: string;
   coachId: string;
+  coachType: string;
   seatNumber: number;
   seatPosition: string;
   journeyDate: string;

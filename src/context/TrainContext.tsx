@@ -165,17 +165,20 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       if (trainSnap.exists()) {
         const trainData = trainSnap.data() as Train;
 
-        // --- Game System Architecture Integration ---
-        // 1. Gather all Seat IDs on this train
-        const allPhysicalSeats: { coachId: string; seat: Seat }[] = [];
-        trainData.coaches.forEach(coach => {
-          coach.seats.forEach(seat => allPhysicalSeats.push({ coachId: coach.id, seat }));
+        // --- Game System Architecture Integration (Class-Pooled Queues) ---
+        // 1. Gather ONLY Physical Seats for the requested Class/CoachType
+        const classCoaches = trainData.coaches.filter(c => c.type === coachType);
+        const classPhysicalSeats: { coachId: string; seat: Seat }[] = [];
+        classCoaches.forEach(coach => {
+          coach.seats.forEach(seat => classPhysicalSeats.push({ coachId: coach.id, seat }));
         });
-        const physicalSeatIds = allPhysicalSeats.map(s => s.seat.id);
+        const physicalSeatIds = classPhysicalSeats.map(s => s.seat.id);
 
-        // Use a configured SoftCap of 30, and RAC Cap of 40 (meaning 10 RAC slots), these can be dynamic later
-        const SOFT_CAP = 30;
-        const RAC_CAP = 40;
+        // 2. Determine Caps based on Class Capacity
+        const totalPhysicalSeats = classPhysicalSeats.length;
+        const SOFT_CAP = classCoaches[0]?.maxConfirmed || Math.floor(totalPhysicalSeats * 0.9);
+        const RAC_OVERFLOW = (coachType === 'SL' ? 8 : 4); // SL has more RAC slots than 3A/2A
+        const RAC_CAP = SOFT_CAP + RAC_OVERFLOW;
 
         const engine = new GameTrainBookingSystem(
           trainData.route.map(s => s.code),
@@ -184,28 +187,29 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           RAC_CAP
         );
 
-        // 2. Hydrate engine with existing bookings for this train
-        const currentTrainBookings = bookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate);
-        // Note: Sort by queue or timestamp to ensure exact reconstruction
-        const sortedBookings = currentTrainBookings.sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
+        // 3. Hydrate engine with existing bookings ONLY for this Class/CoachType
+        const currentClassBookings = bookings.filter(b => 
+            b.trainId === trainId && 
+            b.journeyDate === journeyDate && 
+            b.coachType === coachType
+        );
+        const sortedBookings = currentClassBookings.sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
 
         for (const existing of sortedBookings) {
           const rCheck = engine.isValidRoute(existing.origin, existing.destination);
           if (rCheck.valid) {
-            engine.bookings.push({
+            const eb = {
               playerId: existing.username,
               startStation: existing.origin, endStation: existing.destination,
               startIndex: rCheck.startIndex, endIndex: rCheck.endIndex,
-              status: (existing as any).status || 'CNF',
-              seatId: existing.seatNumber ? `${existing.coachId}-${existing.seatNumber}` : null,
-              queueNumber: (existing as any).queueNumber || 0
-            });
-            if (existing.seatNumber) {
-              const realSeatId = allPhysicalSeats.find(s => s.coachId === existing.coachId && s.seat.number === existing.seatNumber)?.seat.id;
-              if (realSeatId) {
-                const eSeat = engine.seats.find(s => s.id === realSeatId);
-                if (eSeat) eSeat.bookings.push(engine.bookings[engine.bookings.length - 1]);
-              }
+              status: existing.status as any || 'CNF',
+              seatId: existing.seatNumber ? classPhysicalSeats.find(cps => cps.coachId === existing.coachId && cps.seat.number === existing.seatNumber)?.seat.id || null : null,
+              queueNumber: existing.queueNumber || 0
+            };
+            engine.bookings.push(eb);
+            if (eb.seatId) {
+                const eSeat = engine.seats.find(s => s.id === eb.seatId);
+                if (eSeat) eSeat.bookings.push(eb);
             }
           }
         }
@@ -225,7 +229,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         let assignedSeatPosition = 'Pending';
 
         if (resultTicket.seatId) {
-          const seatData = allPhysicalSeats.find(s => s.seat.id === resultTicket.seatId);
+          const seatData = classPhysicalSeats.find(s => s.seat.id === resultTicket.seatId);
           if (seatData) {
             assignedCoachId = seatData.coachId;
             assignedSeatNumber = seatData.seat.number;

@@ -36,25 +36,8 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-primary/95 backdrop-blur supports-[backdrop-filter]:bg-primary/80 sticky top-0 z-50">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
+      <main className="mx-auto max-w-6xl px-4 py-8">
 
-            <div>
-              <h1 className="text-lg font-bold text-primary-foreground tracking-tight">Admin Center</h1>
-              <p className="text-[10px] uppercase font-bold text-primary-foreground/50 tracking-widest">System Management</p>
-            </div>
-          </div>
-          <Link
-            to="/"
-            className="flex items-center gap-2 rounded-lg border border-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground/80 hover:bg-primary-foreground/10 transition-all active:scale-95"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Passenger Portal
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-4">
         {/* Stats */}
         <div className="mb-8 grid gap-4 grid-cols-2 md:grid-cols-4">
           {[

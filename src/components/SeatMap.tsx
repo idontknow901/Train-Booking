@@ -31,16 +31,21 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [isBooking, setIsBooking] = useState(false);
 
-  // Initialize Engine for Live Segmented Availability Check
-  const allPhysicalSeats: { coachId: string; seat: Seat }[] = [];
-  train.coaches.forEach(coach => {
-    coach.seats.forEach(seat => allPhysicalSeats.push({ coachId: coach.id, seat }));
-  });
-  const physicalSeatIds = allPhysicalSeats.map(s => s.seat.id);
+  const coach = train.coaches.find(c => c.id === selectedCoach)!;
 
-  // Constants (should match TrainContext)
-  const SOFT_CAP = 30;
-  const RAC_CAP = 40;
+  // Initialize Engine for Live Segmented Availability Check for THIS COACH CLASS
+  const classCoaches = train.coaches.filter(c => c.type === coach.type);
+  const classPhysicalSeats: { coachId: string; seat: Seat }[] = [];
+  classCoaches.forEach(c => {
+    c.seats.forEach(seat => classPhysicalSeats.push({ coachId: c.id, seat }));
+  });
+  const physicalSeatIds = classPhysicalSeats.map(s => s.seat.id);
+
+  // Constants (Must match TrainContext)
+  const totalPhysicalSeats = classPhysicalSeats.length;
+  const SOFT_CAP = classCoaches[0]?.maxConfirmed || Math.floor(totalPhysicalSeats * 0.9);
+  const RAC_OVERFLOW = (coach.type === 'SL' ? 8 : 4);
+  const RAC_CAP = SOFT_CAP + RAC_OVERFLOW;
 
   const engine = new GameTrainBookingSystem(
     train.route.map(s => s.code),
@@ -49,32 +54,28 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
     RAC_CAP
   );
 
-  // Hydrate engine with existing bookings
-  const currentTrainBookings = bookings.filter(b => b.trainId === train.id && b.journeyDate === journeyDate);
-  const sortedBookings = currentTrainBookings.sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
+  // Hydrate engine with existing bookings for this class
+  const currentClassBookings = bookings.filter(b => b.trainId === train.id && b.journeyDate === journeyDate && b.coachType === coach.type);
+  const sortedBookings = currentClassBookings.sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
 
   for (const existing of sortedBookings) {
     const rCheck = engine.isValidRoute(existing.origin, existing.destination);
     if (rCheck.valid) {
-      engine.bookings.push({
+      const eb = {
         playerId: existing.username,
         startStation: existing.origin, endStation: existing.destination,
         startIndex: rCheck.startIndex, endIndex: rCheck.endIndex,
-        status: (existing as any).status || 'CNF',
-        seatId: existing.seatNumber ? `${existing.coachId}-${existing.seatNumber}` : null,
-        queueNumber: (existing as any).queueNumber || 0
-      });
-      if (existing.seatNumber) {
-        const realSeatId = allPhysicalSeats.find(s => s.coachId === existing.coachId && s.seat.number === existing.seatNumber)?.seat.id;
-        if (realSeatId) {
-          const eSeat = engine.seats.find(s => s.id === realSeatId);
-          if (eSeat) eSeat.bookings.push(engine.bookings[engine.bookings.length - 1]);
-        }
+        status: existing.status as any || 'CNF',
+        seatId: existing.seatNumber ? classPhysicalSeats.find(cps => cps.coachId === existing.coachId && cps.seat.number === existing.seatNumber)?.seat.id || null : null,
+        queueNumber: existing.queueNumber || 0
+      };
+      engine.bookings.push(eb);
+      if (eb.seatId) {
+        const eSeat = engine.seats.find(s => s.id === eb.seatId);
+        if (eSeat) eSeat.bookings.push(eb);
       }
     }
   }
-
-  const coach = train.coaches.find(c => c.id === selectedCoach)!;
 
   const handleBook = async () => {
     if (!username.trim()) {

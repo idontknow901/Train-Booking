@@ -42,7 +42,7 @@ const App = () => (
                   </Link>
                   <Link to="/bookings">
                     <Button variant="ghost" className="text-white font-black text-xs uppercase tracking-widest hover:bg-white/10 px-4 py-2 h-10 flex items-center gap-2">
-                      <Ticket className="h-4 w-4" /> Passenger Portal
+                      <Ticket className="h-4 w-4" /> Booked History
                     </Button>
                   </Link>
                   <div className="h-6 w-px bg-white/20 mx-2" />

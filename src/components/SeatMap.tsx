@@ -47,9 +47,10 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
   const [isBooking, setIsBooking] = useState(false);
   const [successPNR, setSuccessPNR] = useState<string | null>(null);
 
+  const totalConfirmedCapacity = train.coaches.reduce((acc, c) => acc + (c.maxConfirmed || 0), 0);
   const trainBookings = bookings.filter(b => b.trainId === train.id && b.journeyDate === (journeyDate || train.availableDate));
-  const isFull = trainBookings.length >= (train.maxConfirmedSeats ?? 10);
-  const isWL = trainBookings.length >= (train.maxConfirmedSeats ?? 10) + (train.racLimit ?? 5);
+  const isFull = trainBookings.length >= totalConfirmedCapacity;
+  const isWL = trainBookings.length >= totalConfirmedCapacity + (train.racLimit ?? 5);
 
   const coach = train.coaches.find(c => c.id === selectedCoach) || train.coaches[0];
   if (!coach) return <div className="p-8 text-center text-muted-foreground">No coach layout found for this train.</div>;
@@ -288,9 +289,9 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
          </div>
          <p className="text-2xl font-black text-foreground">
             {isFull ? (
-              isWL ? `AVAILABLE - 0 | WL - ${String(trainBookings.length - (train.maxConfirmedSeats || 10) - (train.racLimit || 5) + 1).padStart(2, '0')}` : `AVAILABLE - 0 | RAC - ${String(trainBookings.length - (train.maxConfirmedSeats || 10) + 1).padStart(2, '0')}`
+              isWL ? `AVAILABLE - 0 | WL - ${String(trainBookings.length - totalConfirmedCapacity - (train.racLimit || 5) + 1).padStart(2, '0')}` : `AVAILABLE - 0 | RAC - ${String(trainBookings.length - totalConfirmedCapacity + 1).padStart(2, '0')}`
             ) : (
-              `AVAILABLE - ${String((train.maxConfirmedSeats || 10) - trainBookings.length).padStart(4, '0')} | RAC - 00 | WL - 00`
+              `AVAILABLE - ${String(totalConfirmedCapacity - trainBookings.length).padStart(4, '0')} | RAC - 00 | WL - 00`
             )}
          </p>
       </div>

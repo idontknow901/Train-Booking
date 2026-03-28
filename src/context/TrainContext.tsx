@@ -129,7 +129,8 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         const trainBookings = bookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate);
         const bookedCount = trainBookings.length;
         
-        const maxCNF = trainData.maxConfirmedSeats ?? 50;
+        const totalCoachConfirmed = trainData.coaches.reduce((acc, c) => acc + (c.maxConfirmed || 0), 0);
+        const maxCNF = totalCoachConfirmed || 10;
         const racLimit = trainData.racLimit ?? 20;
 
         if (bookedCount >= maxCNF + racLimit) {

@@ -292,6 +292,8 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
   const [destination, setDestination] = useState('');
   const [intermediateStops, setIntermediateStops] = useState<string[]>([]);
   const [date, setDate] = useState('');
+  const [maxConfirmed, setMaxConfirmed] = useState(10);
+  const [racLimit, setRacLimit] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coaches, setCoaches] = useState<{ type: Coach['type']; seats: number; maxConfirmed: number }[]>([{ type: 'SL', seats: 72, maxConfirmed: 25 }]);
 
@@ -315,6 +317,8 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
       departureTime: '00:00',
       arrivalTime: '00:00',
       availableDate: date || undefined,
+      maxConfirmedSeats: maxConfirmed,
+      racLimit: racLimit,
       coaches: coaches.map((c, i) => {
         // Feature 1: Randomized Visual Scarcity 
         // We pick exactly maxConfirmed number of indices to stay unlocked. The rest is locked (Red).
@@ -421,6 +425,17 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
                 {stations.filter(s => s.code !== origin).map(s => <SelectItem key={s.code} value={s.code}>{s.name} ({s.code})</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Confirmed Seats Cap</label>
+            <Input type="number" value={maxConfirmed} onChange={e => setMaxConfirmed(Number(e.target.value))} className="rounded-xl" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">RAC Limit</label>
+            <Input type="number" value={racLimit} onChange={e => setRacLimit(Number(e.target.value))} className="rounded-xl" />
           </div>
         </div>
 

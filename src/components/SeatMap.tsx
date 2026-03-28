@@ -42,6 +42,10 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [username, setUsername] = useState('');
   const [isBooking, setIsBooking] = useState(false);
+  const [successPNR, setSuccessPNR] = useState<string | null>(null);
+
+  const trainBookings = bookings.filter(b => b.trainId === train.id && b.journeyDate === (journeyDate || train.availableDate));
+  const isFull = trainBookings.length >= (train.maxConfirmedSeats || 50);
 
   const coach = train.coaches.find(c => c.id === selectedCoach) || train.coaches[0];
   if (!coach) return <div className="p-8 text-center text-muted-foreground">No coach layout found for this train.</div>;
@@ -83,26 +87,26 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
       toast.error('Booking is currently closed for maintenance');
       return;
     }
-    if (selectedSeats.length === 0) {
+    if (!isFull && selectedSeats.length === 0) {
       toast.error('Please select at least one seat');
       return;
     }
 
     setIsBooking(true);
     try {
-      const booking = await bookSeat(
+      const result = await bookSeat(
         train.id,
-        coach.id,
-        coach.type,
+        isFull ? null : selectedCoach,
+        isFull ? null : coach.type,
         selectedOrigin,
         selectedDest,
-        train.availableDate || new Date().toISOString().split('T')[0],
-        username.trim(),
-        selectedSeats
+        journeyDate,
+        username,
+        isFull ? [] : selectedSeats
       );
-
-      if (booking) {
-        toast.success(`Successfully booked ${selectedSeats.length} seats!`);
+      if (result) {
+        toast.success(`Ticket Booked! PNR: ${result.pnr}`);
+        setSuccessPNR(result.pnr);
         setSelectedSeats([]);
         setUsername('');
       }
@@ -112,6 +116,31 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
       setIsBooking(false);
     }
   };
+
+  if (successPNR) {
+    return (
+      <div className="rounded-[3rem] border border-border bg-card p-12 text-center shadow-2xl animate-in zoom-in-95 duration-500 max-w-lg mx-auto mt-10">
+        <div className="h-24 w-24 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-8 ring-8 ring-accent/5">
+          <Ticket className="h-12 w-12 text-accent" />
+        </div>
+        <h2 className="text-4xl font-black text-foreground mb-4">Ticket Confirmed!</h2>
+        <div className="bg-muted/30 rounded-2xl p-6 mb-8 border border-border/50 relative overflow-hidden">
+          <div className="absolute top-2 right-4 bg-accent/20 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest text-accent">Confirmed PNR</div>
+          <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground mb-2">Your PNR Number</p>
+          <p className="text-5xl font-black text-accent tracking-tighter">{successPNR}</p>
+        </div>
+        <p className="text-muted-foreground text-sm mb-10 leading-relaxed px-4">Your reservation for <strong>{train.name}</strong> has been successfully processed. You can view it in your history.</p>
+        <div className="flex flex-col gap-3">
+            <Button onClick={onBack} size="lg" className="rounded-2xl h-14 text-lg font-bold bg-accent hover:bg-accent/90 text-accent-foreground">
+                Back to Home
+            </Button>
+            <Button variant="ghost" onClick={() => setSuccessPNR(null)} className="text-xs font-bold uppercase tracking-widest opacity-50">
+                Book Another Ticket
+            </Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleTimelineClick = (code: string) => {
     const idx = train.route.findIndex(s => s.code === code);
@@ -209,69 +238,81 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
         </TabsList>
       </Tabs>
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm overflow-x-auto">
-        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 min-w-max">
-          {coach.seats.map(seat => {
-            const isBooked = isSeatBooked(seat);
-            const isSelected = selectedSeats.some(s => s.id === seat.id);
-            
-            let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20';
-            if (isBooked || seat.isLocked) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed';
-            if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10 ring-4 ring-accent/20';
+      {!isFull ? (
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm overflow-x-auto max-h-[400px] overflow-y-auto">
+          <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 min-w-max">
+            {coach.seats.map(seat => {
+              const isBooked = isSeatBooked(seat);
+              const isSelected = selectedSeats.some(s => s.id === seat.id);
+              
+              let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20';
+              if (isBooked || seat.isLocked) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed';
+              if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10 ring-4 ring-accent/20';
 
-            return (
-              <button
-                key={seat.id}
-                onClick={() => handleSeatClick(seat)}
-                disabled={isBooked || seat.isLocked}
-                className={`relative group aspect-square rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 ${cls}`}
-              >
-                <span className="text-lg font-black tracking-tighter opacity-80">{seat.number}</span>
-                {!isBooked && <span className="text-[9px] uppercase font-black tracking-widest mt-1 text-accent leading-none opacity-60">{seat.position}</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Fixed Non-Scrollable Booking Footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 bg-background/80 backdrop-blur-md border-t border-border animate-in slide-in-from-bottom-full duration-500">
-        <div className="container mx-auto max-w-5xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden">
-            <div className="flex-1 w-full space-y-3">
-               <div className="flex flex-wrap gap-2">
-                  {selectedSeats.length > 0 ? (
-                      selectedSeats.map(s => (
-                          <Badge key={s.id} variant="secondary" className="px-3 py-1 bg-accent/10 border-accent/20 text-accent font-bold">
-                              {coach.type} - {s.number} ({s.position})
-                          </Badge>
-                      ))
-                  ) : (
-                      <p className="text-sm font-medium text-muted-foreground italic">No seats selected yet • Max 4 seats</p>
-                  )}
-               </div>
-               
-               <div className="flex flex-col md:flex-row gap-4 items-center">
-                  <div className="relative flex-1 w-full">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Enter Roblox Username..."
-                      value={username}
-                      onChange={e => setUsername(e.target.value)}
-                      className="pl-10 h-11 rounded-xl bg-background border-border"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleBook}
-                    disabled={isBooking || selectedSeats.length === 0}
-                    className="h-11 px-8 font-black gap-2 w-full md:w-auto shadow-lg hover:scale-105 transition-all bg-[#1a365d] hover:bg-[#2c5282] rounded-xl"
-                  >
-                    {isBooking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ticket className="h-4 w-4" />}
-                    BOOK {selectedSeats.length > 0 ? `${selectedSeats.length} SEATS` : 'NOW'}
-                  </Button>
-               </div>
-            </div>
+              return (
+                <button
+                  key={seat.id}
+                  onClick={() => handleSeatClick(seat)}
+                  disabled={isBooked || seat.isLocked}
+                  className={`relative group aspect-square rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 ${cls}`}
+                >
+                  <span className="text-lg font-black tracking-tighter opacity-80">{seat.number}</span>
+                  {!isBooked && <span className="text-[9px] uppercase font-black tracking-widest mt-1 text-accent leading-none opacity-60">{seat.position}</span>}
+                </button>
+              );
+            })}
           </div>
+        </div>
+      ) : (
+        <div className="rounded-3xl border-2 border-dashed border-accent/20 bg-accent/5 p-12 text-center space-y-4">
+            <div className="h-20 w-20 bg-accent/20 rounded-full flex items-center justify-center mx-auto">
+                <Ticket className="h-10 w-10 text-accent" />
+            </div>
+            <h3 className="text-2xl font-black text-foreground">Confirmed Seats Sold Out</h3>
+            <p className="text-muted-foreground max-w-sm mx-auto">This train has reached its physical seat capacity. Next bookings will be assigned <strong>RAC</strong> or <strong>Waiting List</strong> status.</p>
+        </div>
+      )}
+
+      {/* Integrated Booking Form (Scrollable) */}
+      <div className="mt-8 pt-8 border-t border-border animate-in fade-in slide-in-from-bottom-10 duration-700">
+        <div className="max-w-xl mx-auto space-y-6">
+          <div className="text-center space-y-2 mb-4">
+             <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">Passenger Information</p>
+             {selectedSeats.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2 mt-4">
+                   {selectedSeats.map(s => (
+                      <Badge key={s.id} variant="secondary" className="px-3 py-1 bg-accent/10 border-accent/20 text-accent font-black">
+                         {s.number} ({s.position})
+                      </Badge>
+                   ))}
+                </div>
+             )}
+          </div>
+
+          <div className="relative group p-1">
+             <User className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-accent transition-colors" />
+             <input
+               type="text"
+               value={username}
+               onChange={(e) => setUsername(e.target.value)}
+               placeholder="Enter Roblox Username..."
+               className="w-full bg-muted/30 border-2 border-border/50 rounded-2xl h-16 pl-14 pr-6 text-xl font-bold placeholder:text-muted-foreground/40 focus:outline-none focus:border-accent/40 focus:ring-8 focus:ring-accent/5 transition-all text-foreground"
+             />
+          </div>
+
+          <Button
+            onClick={handleBook}
+            disabled={isBooking || (!isFull && selectedSeats.length === 0) || !username}
+            className="w-full h-18 rounded-2xl bg-accent hover:bg-accent/90 text-accent-foreground text-2xl font-black shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 py-8"
+          >
+            {isBooking ? (
+              <div className="flex items-center gap-3"><Loader2 className="h-6 w-6 animate-spin" /> Processing...</div>
+            ) : (
+              <div className="flex items-center gap-3"><Ticket className="h-6 w-6" /> {isFull ? 'BOOK RAC / WL TICKET' : 'CONFIRM & BOOK SEATS'}</div>
+            )}
+          </Button>
+          
+          <p className="text-[10px] text-center text-muted-foreground font-medium uppercase tracking-widest opacity-40 py-4">Total Amount: FREE (Simulation Only)</p>
         </div>
       </div>
     </div>

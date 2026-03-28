@@ -106,8 +106,8 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
   const bookSeat = useCallback(async (
     trainId: string,
-    coachId: string,
-    coachType: string,
+    coachId: string | null,
+    coachType: string | null,
     origin: string,
     destination: string,
     journeyDate: string,
@@ -125,26 +125,41 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
       if (trainSnap.exists()) {
         const trainData = trainSnap.data() as Train;
-        const pnr = Math.random().toString().substring(2, 12);
+        let status = 'CNF';
+        const trainBookings = bookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate);
+        const bookedCount = trainBookings.length;
+        
+        const maxCNF = trainData.maxConfirmedSeats ?? 50;
+        const racLimit = trainData.racLimit ?? 20;
 
-        const updatedCoaches = trainData.coaches.map(coach => {
-           if (coach.id === coachId) {
-              const updatedSeats = coach.seats.map(seat => {
-                 const isSelected = selectedSeats.some(s => s.id === seat.id);
-                 if (isSelected) {
-                    if (seat.isBooked) throw new Error(`Seat ${seat.number} was just booked by someone else.`);
-                    return { ...seat, isBooked: true, bookedBy: username, pnr };
-                 }
-                 return seat;
-              });
-              return { ...coach, seats: updatedSeats };
-           }
-           return coach;
-        });
+        if (bookedCount >= maxCNF + racLimit) {
+          status = `WL ${bookedCount - (maxCNF + racLimit) + 1}`;
+        } else if (bookedCount >= maxCNF) {
+          status = `RAC ${bookedCount - maxCNF + 1}`;
+        }
+
+        let updatedCoaches = trainData.coaches;
+        if (status === 'CNF') {
+           updatedCoaches = trainData.coaches.map(coach => {
+              if (coach.id === coachId) {
+                 const updatedSeats = coach.seats.map(seat => {
+                    const isSelected = selectedSeats.some(s => s.id === seat.id);
+                    if (isSelected) {
+                       if (seat.isBooked) throw new Error(`Seat ${seat.number} was just booked by someone else.`);
+                       return { ...seat, isBooked: true, bookedBy: username, pnr: Math.random().toString(36).substr(2, 9).toUpperCase() };
+                    }
+                    return seat;
+                 });
+                 return { ...coach, seats: updatedSeats };
+              }
+              return coach;
+           });
+        }
 
         const originIdx = trainData.route.findIndex(s => s.code === origin);
         const destIdx = trainData.route.findIndex(s => s.code === destination);
         const routeStops = trainData.route.slice(originIdx, destIdx + 1).map(s => s.code);
+        const pnr = Math.random().toString(36).substr(2, 9).toUpperCase();
 
         const newBooking: Booking = {
           pnr,
@@ -152,22 +167,24 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           trainId,
           trainName: trainData.name,
           trainNumber: trainData.number,
-          coachId,
-          coachType,
-          seats: selectedSeats.map(s => ({
+          coachId: status === 'CNF' ? (coachId || '') : 'GN',
+          coachType: status === 'CNF' ? (coachType || '') : 'General',
+          seats: status === 'CNF' ? selectedSeats.map(s => ({
             number: s.number,
             position: s.position,
-            coachId: coachId
-          })),
+            coachId: coachId || ''
+          })) : [],
           journeyDate,
           origin,
           destination,
           routeStops,
           bookedAt: new Date().toISOString(),
-          status: 'CNF'
+          status
         };
 
-        await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
+        if (status === 'CNF') {
+          await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
+        }
         await withTimeout(setDoc(doc(db, 'bookings', pnr), newBooking), 'Saving booking');
 
         try {

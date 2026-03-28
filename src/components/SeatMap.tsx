@@ -267,7 +267,8 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
 
       <div className="flex gap-4 text-sm flex-wrap">
         <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-emerald-500/20 border-emerald-500/50" /> Available (CNF)</span>
-        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-destructive/20 border-destructive/50" /> Segment Booked</span>
+        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-amber-500/20 border-amber-500/50" /> RAC (Shared)</span>
+        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-destructive/20 border-destructive/50" /> Fully Booked</span>
         <span className="flex items-center gap-3 text-xs opacity-70 italic ml-auto">* Colors dynamic to selection</span>
       </div>
 
@@ -327,19 +328,13 @@ function SeatGrid({
   const cols = 8;
   const rCheck = engine.isValidRoute(selectedOrigin, selectedDest);
   
-  // Calculate Segmented Stats
-  const segmentStats = coach.seats.reduce((acc, s) => {
-    const isOccupied = engine.seats.find(es => es.id === s.id)?.bookings.some(b => 
-      GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
-    );
-    if (isOccupied || s.isLocked) acc.lockedOrBooked++;
-    return acc;
-  }, { lockedOrBooked: 0 });
-
-  const RAC_LIMIT = 10;
-  const totalLocked = segmentStats.lockedOrBooked;
-  const currentRAC = Math.min(totalLocked, RAC_LIMIT);
-  const currentWL = Math.max(0, totalLocked - RAC_LIMIT);
+  // Calculate Segmented Stats from actual engine bookings
+  const segmentBookings = engine.bookings.filter(b => 
+    GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
+  );
+  
+  const currentRAC = segmentBookings.filter(b => b.status === 'RAC').length;
+  const currentWL = segmentBookings.filter(b => b.status === 'WL').length;
 
   return (
     <div className="space-y-4">
@@ -347,14 +342,18 @@ function SeatGrid({
         <div className="grid gap-2 min-w-[500px]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(50px, 1fr))` }}>
           {coach.seats.map(seat => {
             const isSelected = selectedSeat?.id === seat.id;
-            const isOccupied = engine.seats.find(es => es.id === seat.id)?.bookings.some(b => 
+            const seatBookings = engine.seats.find(es => es.id === seat.id)?.bookings.filter(b => 
                GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
-            );
+            ) || [];
+            
+            const isOccupied = seatBookings.length > 0;
+            const isRAC = seatBookings.some(b => b.status === 'RAC');
             const isUnavailable = isOccupied || seat.isLocked;
             
             let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20'; // Green
             if (isUnavailable) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed'; // Red
-            if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10'; // Blue
+            if (isRAC) cls = 'bg-amber-500/10 border-amber-500/30 text-amber-600 cursor-not-allowed'; // Yellow for RAC
+            if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10'; // Blue for selection
 
             let displayStatus = String(seat.number);
             let displaySub = seat.position.substring(0, 1) + (seat.position.includes(' ') ? seat.position.split(' ')[1].substring(0, 1) : '');
@@ -382,7 +381,7 @@ function SeatGrid({
             <span className="text-sm font-black text-amber-700">RAC Queue</span>
           </div>
           <p className="font-mono text-2xl font-black text-amber-600">
-            {currentRAC < RAC_LIMIT ? `AVBL ${RAC_LIMIT - currentRAC}` : `RAC ${currentRAC}`}
+            {currentRAC > 0 ? `RAC ${currentRAC}` : 'AVAILABLE'}
           </p>
         </div>
         <div className="flex items-center justify-between p-4 rounded-2xl border border-destructive/20 bg-destructive/5">

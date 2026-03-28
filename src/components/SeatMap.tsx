@@ -22,7 +22,10 @@ import {
   User, 
   Loader2, 
   MapPin,
-  ArrowLeft
+  ArrowLeft,
+  Check,
+  Copy,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -45,7 +48,8 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
   const [successPNR, setSuccessPNR] = useState<string | null>(null);
 
   const trainBookings = bookings.filter(b => b.trainId === train.id && b.journeyDate === (journeyDate || train.availableDate));
-  const isFull = trainBookings.length >= (train.maxConfirmedSeats || 50);
+  const isFull = trainBookings.length >= (train.maxConfirmedSeats ?? 10);
+  const isWL = trainBookings.length >= (train.maxConfirmedSeats ?? 10) + (train.racLimit ?? 5);
 
   const coach = train.coaches.find(c => c.id === selectedCoach) || train.coaches[0];
   if (!coach) return <div className="p-8 text-center text-muted-foreground">No coach layout found for this train.</div>;
@@ -118,24 +122,66 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
   };
 
   if (successPNR) {
+    const booking = bookings.find(b => b.pnr === successPNR);
     return (
-      <div className="rounded-[3rem] border border-border bg-card p-12 text-center shadow-2xl animate-in zoom-in-95 duration-500 max-w-lg mx-auto mt-10">
-        <div className="h-24 w-24 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-8 ring-8 ring-accent/5">
-          <Ticket className="h-12 w-12 text-accent" />
+      <div className="max-w-xl mx-auto mt-10 space-y-4 animate-in zoom-in-95 duration-500">
+        <div className="bg-background rounded-[2rem] border border-border/50 shadow-2xl overflow-hidden p-8 text-center">
+          <div className="h-20 w-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Check className="h-10 w-10 text-emerald-600" />
+          </div>
+          <h2 className="text-3xl font-black text-foreground mb-8">Ticket Confirmed!</h2>
+          
+          <div className="bg-muted/30 rounded-2xl p-6 border border-border/50 relative mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">PNR Number</span>
+              <button 
+                onClick={() => { navigator.clipboard.writeText(successPNR); toast.success('PNR Copied!'); }}
+                className="text-[10px] flex items-center gap-1 font-bold text-accent"
+              >
+                <Copy className="h-3 w-3" /> Copy
+              </button>
+            </div>
+            <p className="text-4xl font-black text-accent tracking-[0.2em]">{successPNR}</p>
+          </div>
+
+          <div className="space-y-4 text-left border-y border-border/50 py-6 mb-8">
+            <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground font-medium">Passenger</span>
+                <span className="font-bold text-foreground">{booking?.username}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground font-medium">Train</span>
+                <span className="font-bold text-foreground">{booking?.trainName} (#{booking?.trainNumber})</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground font-medium">Route</span>
+                <span className="font-bold text-accent">{booking?.origin} → {booking?.destination}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground font-medium">Coach / Seat</span>
+                <span className="font-bold text-foreground">
+                  {booking?.status === 'CNF' ? (
+                    `${booking.coachType} / ${booking.seats.map(s => `Seat ${s.number} (${s.position})`).join(', ')}`
+                  ) : (
+                    booking?.status
+                  )}
+                </span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground font-medium">Journey Date</span>
+                <span className="font-bold text-foreground">{booking?.journeyDate}</span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground italic font-medium">This is an electronically generated ticket. No signature is required.</p>
         </div>
-        <h2 className="text-4xl font-black text-foreground mb-4">Ticket Confirmed!</h2>
-        <div className="bg-muted/30 rounded-2xl p-6 mb-8 border border-border/50 relative overflow-hidden">
-          <div className="absolute top-2 right-4 bg-accent/20 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest text-accent">Confirmed PNR</div>
-          <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground mb-2">Your PNR Number</p>
-          <p className="text-5xl font-black text-accent tracking-tighter">{successPNR}</p>
-        </div>
-        <p className="text-muted-foreground text-sm mb-10 leading-relaxed px-4">Your reservation for <strong>{train.name}</strong> has been successfully processed. You can view it in your history.</p>
+
         <div className="flex flex-col gap-3">
-            <Button onClick={onBack} size="lg" className="rounded-2xl h-14 text-lg font-bold bg-accent hover:bg-accent/90 text-accent-foreground">
-                Back to Home
+            <Button variant="outline" className="rounded-2xl h-14 font-bold border-accent text-accent hover:bg-accent/5">
+                <Download className="mr-2 h-4 w-4" /> Download PDF Ticket
             </Button>
-            <Button variant="ghost" onClick={() => setSuccessPNR(null)} className="text-xs font-bold uppercase tracking-widest opacity-50">
-                Book Another Ticket
+            <Button onClick={onBack} className="rounded-2xl h-14 font-bold bg-[#1a365d] hover:bg-[#1a365d]/90 text-white">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Search
             </Button>
         </div>
       </div>
@@ -146,36 +192,25 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
     const idx = train.route.findIndex(s => s.code === code);
     const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
     const destIdx = train.route.findIndex(s => s.code === selectedDest);
-
-    if (idx < destIdx && idx >= 0) {
-       setSelectedOrigin(code);
-       setSelectedSeats([]);
-    } else if (idx > originIdx && idx < train.route.length) {
-       setSelectedDest(code);
-       setSelectedSeats([]);
-    }
+    
+    if (idx < destIdx) setSelectedOrigin(code);
+    else if (idx > originIdx) setSelectedDest(code);
+    setSelectedSeats([]);
   };
 
   return (
-    <div className="space-y-6 pb-32 animate-in fade-in duration-500">
-      <div className="flex items-center gap-4 mb-4">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onBack}
-          className="rounded-xl border-border bg-card/50 backdrop-blur-sm shadow-sm md:flex hidden"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back To Search
+    <div className="space-y-6 pb-20">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={onBack} className="group flex items-center gap-2 hover:bg-accent/5 rounded-2xl">
+          <ArrowLeft className="h-4 w-4 text-accent transition-transform group-hover:-translate-x-1" />
+          <span className="text-sm font-bold uppercase tracking-widest text-accent">Adjust Search</span>
         </Button>
       </div>
 
-      {/* Reverted Journey Configuration Box */}
-      <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-6 shadow-xl space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-card rounded-[2rem] border border-border/50 p-8 shadow-sm">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-10">
           <div className="space-y-1">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent flex items-center gap-2">
-              <MapPin className="h-3 w-3" /> Journey Configuration
-            </h3>
+            <h2 className="text-3xl font-black text-foreground tracking-tight">{train.name}</h2>
             <p className="text-sm text-muted-foreground font-medium">Customize your boarding and destination stations below</p>
           </div>
 
@@ -199,33 +234,6 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
              </Select>
           </div>
         </div>
-
-        <div className="relative pt-2 pb-6 px-4">
-          <div className="relative flex items-center justify-between before:absolute before:left-0 before:right-0 before:h-1 before:bg-muted before:top-1/2 before:-translate-y-1/2 before:z-0">
-             {train.route.map((stop, idx) => {
-                const isOrigin = stop.code === selectedOrigin;
-                const isDest = stop.code === selectedDest;
-                const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
-                const destIdx = train.route.findIndex(s => s.code === selectedDest);
-                
-                let dotColor = 'bg-muted border-border';
-                if (idx >= originIdx && idx <= destIdx) dotColor = 'bg-accent border-accent ring-4 ring-accent/10';
-
-                return (
-                  <button 
-                    key={stop.code} 
-                    onClick={() => handleTimelineClick(stop.code)}
-                    className="relative z-10 flex flex-col items-center group"
-                  >
-                    <div className={`h-4 w-4 rounded-full ${dotColor} flex items-center justify-center transition-all duration-300 ${isOrigin || isDest ? 'scale-125 ring-8 ring-accent/10 bg-accent' : 'group-hover:scale-125 bg-muted'}`} />
-                    <div className="absolute top-8 flex flex-col items-center">
-                      <span className={`text-[10px] uppercase font-medium tracking-widest whitespace-nowrap transition-colors ${isOrigin || isDest ? 'text-accent font-bold' : 'text-muted-foreground group-hover:text-foreground'}`}>{stop.code}</span>
-                    </div>
-                  </button>
-                );
-             })}
-          </div>
-        </div>
       </div>
 
       <Tabs value={selectedCoach} onValueChange={v => { setSelectedCoach(v); setSelectedSeats([]); }}>
@@ -239,81 +247,89 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
       </Tabs>
 
       {!isFull ? (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm overflow-x-auto max-h-[400px] overflow-y-auto">
-          <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 min-w-max">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm overflow-x-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 min-w-max">
             {coach.seats.map(seat => {
               const isBooked = isSeatBooked(seat);
               const isSelected = selectedSeats.some(s => s.id === seat.id);
               
-              let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20';
-              if (isBooked || seat.isLocked) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed';
-              if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10 ring-4 ring-accent/20';
+              let cls = 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/10';
+              if (isBooked || seat.isLocked) cls = 'bg-muted border-transparent text-muted-foreground/30 cursor-not-allowed';
+              if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-md scale-[1.02] z-10 ring-4 ring-accent/10';
 
               return (
                 <button
                   key={seat.id}
                   onClick={() => handleSeatClick(seat)}
                   disabled={isBooked || seat.isLocked}
-                  className={`relative group aspect-square rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 ${cls}`}
+                  className={`relative group h-24 border-2 rounded-xl flex flex-col items-center justify-center transition-all duration-300 ${cls}`}
                 >
-                  <span className="text-lg font-black tracking-tighter opacity-80">{seat.number}</span>
-                  {!isBooked && <span className="text-[9px] uppercase font-black tracking-widest mt-1 text-accent leading-none opacity-60">{seat.position}</span>}
+                  <span className="text-3xl font-black mb-1">{seat.number}</span>
+                  <span className="text-[10px] uppercase font-black tracking-widest opacity-60">
+                    {seat.position}
+                  </span>
                 </button>
               );
             })}
           </div>
         </div>
       ) : (
-        <div className="rounded-3xl border-2 border-dashed border-accent/20 bg-accent/5 p-12 text-center space-y-4">
-            <div className="h-20 w-20 bg-accent/20 rounded-full flex items-center justify-center mx-auto">
-                <Ticket className="h-10 w-10 text-accent" />
-            </div>
-            <h3 className="text-2xl font-black text-foreground">Confirmed Seats Sold Out</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto">This train has reached its physical seat capacity. Next bookings will be assigned <strong>RAC</strong> or <strong>Waiting List</strong> status.</p>
+        <div className="rounded-[2rem] border-2 border-dashed border-accent/20 bg-accent/5 p-12 text-center">
+            <Ticket className="h-12 w-12 text-accent mx-auto mb-4" />
+            <h3 className="text-2xl font-black">Confirmed Seats Sold Out</h3>
+            <p className="text-muted-foreground max-w-sm mx-auto">This train has reached its physical seat capacity. Booking will be assigned RAC or Waiting List status.</p>
         </div>
       )}
 
-      {/* Integrated Booking Form (Scrollable) */}
-      <div className="mt-8 pt-8 border-t border-border animate-in fade-in slide-in-from-bottom-10 duration-700">
-        <div className="max-w-xl mx-auto space-y-6">
-          <div className="text-center space-y-2 mb-4">
-             <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">Passenger Information</p>
-             {selectedSeats.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-2 mt-4">
-                   {selectedSeats.map(s => (
-                      <Badge key={s.id} variant="secondary" className="px-3 py-1 bg-accent/10 border-accent/20 text-accent font-black">
-                         {s.number} ({s.position})
-                      </Badge>
-                   ))}
-                </div>
-             )}
-          </div>
-
-          <div className="relative group p-1">
-             <User className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-accent transition-colors" />
-             <input
-               type="text"
-               value={username}
-               onChange={(e) => setUsername(e.target.value)}
-               placeholder="Enter Roblox Username..."
-               className="w-full bg-muted/30 border-2 border-border/50 rounded-2xl h-16 pl-14 pr-6 text-xl font-bold placeholder:text-muted-foreground/40 focus:outline-none focus:border-accent/40 focus:ring-8 focus:ring-accent/5 transition-all text-foreground"
-             />
-          </div>
-
-          <Button
-            onClick={handleBook}
-            disabled={isBooking || (!isFull && selectedSeats.length === 0) || !username}
-            className="w-full h-18 rounded-2xl bg-accent hover:bg-accent/90 text-accent-foreground text-2xl font-black shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 py-8"
-          >
-            {isBooking ? (
-              <div className="flex items-center gap-3"><Loader2 className="h-6 w-6 animate-spin" /> Processing...</div>
+      <div className="rounded-[2rem] border border-orange-200 bg-orange-50/50 p-8 shadow-sm animate-in slide-in-from-bottom-5 duration-500">
+         <div className="flex items-center gap-3 mb-6">
+            <Ticket className="h-5 w-5 text-orange-400" />
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-orange-400">Current Queue Status</span>
+         </div>
+         <p className="text-3xl font-black text-foreground">
+            {isFull ? (
+              isWL ? `Waitlisted (WL ${trainBookings.length - (train.maxConfirmedSeats || 10) - (train.racLimit || 5) + 1})` : `RAC (RAC ${trainBookings.length - (train.maxConfirmedSeats || 10) + 1})`
             ) : (
-              <div className="flex items-center gap-3"><Ticket className="h-6 w-6" /> {isFull ? 'BOOK RAC / WL TICKET' : 'CONFIRM & BOOK SEATS'}</div>
+              `Available (${(train.maxConfirmedSeats || 10) - trainBookings.length} Seats Left)`
             )}
-          </Button>
-          
-          <p className="text-[10px] text-center text-muted-foreground font-medium uppercase tracking-widest opacity-40 py-4">Total Amount: FREE (Simulation Only)</p>
-        </div>
+         </p>
+      </div>
+
+      <div className="rounded-[2rem] border border-orange-200 bg-orange-50/30 p-8 shadow-sm">
+         <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <Ticket className="h-5 w-5 text-orange-400" />
+              <h3 className="text-xl font-black text-foreground">
+                {selectedSeats.length > 0 ? (
+                  `Seat #${selectedSeats[0].number} — ${selectedSeats[0].position}`
+                ) : (
+                  'Passenger Assignment'
+                )}
+              </h3>
+            </div>
+            {selectedSeats.length > 1 && <Badge variant="secondary" className="bg-orange-100 text-orange-600 font-black">+ {selectedSeats.length - 1} more</Badge>}
+         </div>
+
+         <div className="flex flex-col md:flex-row gap-4 items-stretch">
+            <div className="relative flex-1">
+               <User className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+               <input
+                 type="text"
+                 value={username}
+                 onChange={(e) => setUsername(e.target.value)}
+                 placeholder="Roblox Username"
+                 className="w-full bg-white border border-border/60 rounded-2xl h-14 pl-14 pr-6 text-lg font-bold placeholder:text-muted-foreground/30 focus:outline-none focus:border-orange-200 focus:ring-8 focus:ring-orange-100/50 transition-all shadow-sm"
+               />
+            </div>
+            <Button
+              onClick={handleBook}
+              disabled={isBooking || (!isFull && selectedSeats.length === 0) || !username}
+              className="h-14 px-10 rounded-2xl bg-[#ffcb74] hover:bg-[#ffbe54] text-[#8b5e1a] font-black text-lg gap-2 shadow-lg shadow-orange-200/50 transition-all active:scale-[0.98]"
+            >
+              {isBooking ? <Loader2 className="h-5 w-5 animate-spin" /> : <Ticket className="h-5 w-5" />}
+              Generate Ticket
+            </Button>
+         </div>
       </div>
     </div>
   );

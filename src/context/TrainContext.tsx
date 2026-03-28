@@ -159,7 +159,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         const originIdx = trainData.route.findIndex(s => s.code === origin);
         const destIdx = trainData.route.findIndex(s => s.code === destination);
         const routeStops = trainData.route.slice(originIdx, destIdx + 1).map(s => s.code);
-        const pnr = Math.random().toString(36).substr(2, 9).toUpperCase();
+        const pnr = Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
 
         const newBooking: Booking = {
           pnr,

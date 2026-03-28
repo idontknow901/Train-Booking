@@ -305,9 +305,10 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
   const [number, setNumber] = useState('');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
+  const [intermediateStops, setIntermediateStops] = useState<string[]>([]);
   const [date, setDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [coaches, setCoaches] = useState<{ type: Coach['type']; seats: number }[]>([{ type: 'SL', seats: 72 }]);
+  const [coaches, setCoaches] = useState<{ type: Coach['type']; seats: number; maxConfirmed: number }[]>([{ type: 'SL', seats: 72, maxConfirmed: 25 }]);
 
   const handleSubmit = async () => {
     if (!name || !number || !origin || !destination || origin === destination) {
@@ -317,28 +318,44 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
 
     const originStation = stations.find(s => s.code === origin)!;
     const destStation = stations.find(s => s.code === destination)!;
-
+    const mappedStops = intermediateStops.map(code => stations.find(s => s.code === code)).filter(Boolean) as Station[];
+    
     setIsSubmitting(true);
 
     const train: Train = {
       id: `train-${Date.now()}`,
       name,
       number,
-      route: [originStation, destStation],
+      route: [originStation, ...mappedStops, destStation],
       departureTime: '00:00',
       arrivalTime: '00:00',
       availableDate: date || undefined,
-      coaches: coaches.map((c, i) => ({
-        id: `${c.type}-${Date.now()}-${i}`,
-        type: c.type,
-        totalSeats: c.seats,
-        seats: Array.from({ length: c.seats }, (_, j) => ({
-          id: `seat-${j + 1}`,
-          number: j + 1,
-          position: (['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper'] as const)[j % 5],
-          isBooked: false,
-        })),
-      })),
+      coaches: coaches.map((c, i) => {
+        // Feature 1: Randomized Visual Scarcity 
+        // We pick exactly maxConfirmed number of indices to stay unlocked. The rest is locked (Red).
+        const seatIndices = Array.from({ length: c.seats }, (_, j) => j);
+        const unlockedIndices = new Set();
+        
+        // Randomly pick unique indices to unlock
+        while (unlockedIndices.size < Math.min(c.maxConfirmed, c.seats)) {
+          const rand = Math.floor(Math.random() * c.seats);
+          unlockedIndices.add(rand);
+        }
+
+        return {
+          id: `${c.type}-${Date.now()}-${i}`,
+          type: c.type,
+          totalSeats: c.seats,
+          maxConfirmed: c.maxConfirmed,
+          seats: Array.from({ length: c.seats }, (_, j) => ({
+            id: `seat-${j + 1}`,
+            number: j + 1,
+            position: (['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper'] as const)[j % 5],
+            isBooked: false,
+            isLocked: !unlockedIndices.has(j) // Lock it if it wasn't randomly selected
+          })),
+        };
+      }),
     };
 
     try {
@@ -347,8 +364,9 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
       setNumber('');
       setOrigin('');
       setDestination('');
+      setIntermediateStops([]);
       setDate('');
-      setCoaches([{ type: 'SL', seats: 72 }]);
+      setCoaches([{ type: 'SL', seats: 72, maxConfirmed: 25 }]);
 
       await onAdd(train);
       toast.success(`Train "${train.name}" added!`);
@@ -398,6 +416,32 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
           </div>
         </div>
 
+          <div className="space-y-1.5 pt-2">
+            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Intermediate Stops (Multi-Route)</label>
+            <div className="space-y-2">
+                {intermediateStops.map((stopCode, idx) => (
+                   <div key={idx} className="flex items-center gap-2">
+                     <Select value={stopCode} onValueChange={(v) => {
+                         const n = [...intermediateStops];
+                         n[idx] = v;
+                         setIntermediateStops(n);
+                     }}>
+                         <SelectTrigger className="rounded-xl"><SelectValue placeholder="Intermediate Station" /></SelectTrigger>
+                         <SelectContent>
+                             {stations.filter(s => s.code !== origin && s.code !== destination).map(s => <SelectItem key={s.code} value={s.code}>{s.name} ({s.code})</SelectItem>)}
+                         </SelectContent>
+                     </Select>
+                     <Button variant="ghost" size="icon" onClick={() => setIntermediateStops(intermediateStops.filter((_, i) => i !== idx))} className="h-9 w-9 text-destructive hover:bg-destructive/10">
+                        <Trash2 className="h-3.5 w-3.5" />
+                     </Button>
+                   </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={() => setIntermediateStops([...intermediateStops, ''])} className="w-full rounded-xl border-dashed">
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Stop
+                </Button>
+            </div>
+          </div>
+
         <div className="space-y-1.5">
           <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1 flex items-center gap-1">
             <Calendar className="h-3 w-3" /> Available Date (Optional)
@@ -420,13 +464,21 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
                     {['SL', '3A', '2A', '1A'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <div className="relative flex-1">
+                <div className="relative w-28">
                   <Input type="number" value={c.seats} onChange={e => {
                     const updated = [...coaches];
-                    updated[i].seats = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                    updated[i].seats = Math.max(1, Math.min(200, parseInt(e.target.value) || 1));
                     setCoaches(updated);
-                  }} className="h-9 rounded-lg text-xs pr-12" min={1} max={100} />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">SEATS</span>
+                  }} className="h-9 rounded-lg text-xs" min={1} max={200} title="Total Physical Seats" />
+                  <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold" title="Physical Total">TOT</span>
+                </div>
+                <div className="relative w-32 border-l pl-2">
+                  <Input type="number" value={c.maxConfirmed} onChange={e => {
+                    const updated = [...coaches];
+                    updated[i].maxConfirmed = Math.max(1, Math.min(updated[i].seats, parseInt(e.target.value) || 1));
+                    setCoaches(updated);
+                  }} className="h-9 rounded-lg text-xs border-emerald-500/50" min={1} max={200} title="Max Confirmed (Green Seats)" />
+                  <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] text-emerald-500 font-bold" title="Green Slots Limit">CNF</span>
                 </div>
                 {coaches.length > 1 && (
                   <Button variant="ghost" size="icon" onClick={() => setCoaches(coaches.filter((_, j) => j !== i))} className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-lg">
@@ -435,7 +487,7 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
                 )}
               </div>
             ))}
-            <Button variant="outline" size="sm" onClick={() => setCoaches([...coaches, { type: 'SL', seats: 72 }])} className="w-full rounded-xl border-dashed py-5 border-2 hover:border-accent/50 hover:bg-accent/5 transition-all text-xs font-bold uppercase tracking-wider">
+            <Button variant="outline" size="sm" onClick={() => setCoaches([...coaches, { type: 'SL', seats: 72, maxConfirmed: 25 }])} className="w-full rounded-xl border-dashed py-5 border-2 hover:border-accent/50 hover:bg-accent/5 transition-all text-xs font-bold uppercase tracking-wider">
               <Plus className="mr-1 h-3.5 w-3.5" /> Add CoachType
             </Button>
           </div>

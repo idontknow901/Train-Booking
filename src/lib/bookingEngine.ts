@@ -104,7 +104,7 @@ export class GameTrainBookingSystem {
   /**
    * Primary API to process a booking request for a player.
    */
-  bookTicket(playerId: string, startStation: string, endStation: string): PlayerBooking {
+  bookTicket(playerId: string, startStation: string, endStation: string, preferredSeatId?: string | null): PlayerBooking {
     const routeCheck = this.isValidRoute(startStation, endStation);
     if (!routeCheck.valid) {
       throw new Error(`Invalid route: Cannot travel from ${startStation} to ${endStation}. Check station sequence.`);
@@ -113,7 +113,23 @@ export class GameTrainBookingSystem {
     const { startIndex, endIndex } = routeCheck;
     
     // 1. Check for immediate Confirmed (CNF) seat via soft scarcity pool
-    const availableSeat = this.findAvailableSeatForSegment(startIndex, endIndex);
+    // If a user explicitly requested a green seat, check if that specific seat is valid
+    let availableSeat = null;
+    
+    if (preferredSeatId) {
+        const targetSeat = this.seats.find(s => s.id === preferredSeatId);
+        if (targetSeat) {
+            const isOccupied = targetSeat.bookings.some(booking => 
+                GameTrainBookingSystem.segmentsOverlap(startIndex, endIndex, booking.startIndex, booking.endIndex)
+            );
+            if (!isOccupied) availableSeat = targetSeat;
+        }
+    }
+    
+    // Fallback: If no preferred seat or it's invalid, find the first available based on capacity limits
+    if (!availableSeat) {
+        availableSeat = this.findAvailableSeatForSegment(startIndex, endIndex);
+    }
 
     let newBooking: PlayerBooking;
 

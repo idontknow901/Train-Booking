@@ -212,7 +212,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         // 3. Request new booking status from the Engine!
         let resultTicket;
         try {
-            resultTicket = engine.bookTicket(username, origin, destination);
+            resultTicket = engine.bookTicket(username, origin, destination, seatId);
         } catch (err: any) {
             console.error('Engine rejected booking:', err);
             return null;

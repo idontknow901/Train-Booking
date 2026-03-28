@@ -18,6 +18,7 @@ export interface Coach {
   id: string;
   type: 'SL' | '3A' | '2A' | '1A';
   totalSeats: number;
+  maxConfirmed: number;
   seats: Seat[];
 }
 
@@ -26,6 +27,7 @@ export interface Seat {
   number: number;
   position: 'Lower' | 'Middle' | 'Upper' | 'Side Lower' | 'Side Upper';
   isBooked: boolean;
+  isLocked?: boolean;
   bookedBy?: string;
   pnr?: string;
 }

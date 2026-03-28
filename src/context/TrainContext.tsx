@@ -250,6 +250,10 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           return coach;
         });
 
+        const originIdx = trainData.route.findIndex(s => s.code === origin);
+        const destIdx = trainData.route.findIndex(s => s.code === destination);
+        const routeStops = trainData.route.slice(originIdx, destIdx + 1).map(s => s.code);
+
         const newBooking = {
           pnr,
           username,
@@ -262,6 +266,7 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           journeyDate,
           origin,
           destination,
+          routeStops,
           bookedAt: new Date().toISOString(),
           status: resultTicket.status,
           queueNumber: resultTicket.queueNumber

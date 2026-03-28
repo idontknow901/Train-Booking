@@ -44,6 +44,7 @@ export interface Booking {
   journeyDate: string;
   origin: string;
   destination: string;
+  routeStops?: string[];
   bookedAt: string;
   status?: string;
   queueNumber?: number;

@@ -37,7 +37,7 @@ export async function sendBookingWebhook(booking: Booking) {
       },
       {
         name: '📍 Route',
-        value: `${booking.origin} → ${booking.destination}`,
+        value: booking.routeStops?.length ? booking.routeStops.join(' ➔ ') : `${booking.origin} → ${booking.destination}`,
         inline: false,
       },
       {

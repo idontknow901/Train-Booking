@@ -44,6 +44,7 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
   const [isBooking, setIsBooking] = useState(false);
 
   const coach = train.coaches.find(c => c.id === selectedCoach) || train.coaches[0];
+  if (!coach) return <div className="p-8 text-center text-muted-foreground">No coach layout found for this train.</div>;
 
   const handleSeatClick = (seat: Seat) => {
     if (isSeatBooked(seat)) return;
@@ -60,12 +61,17 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
   };
 
   const isSeatBooked = (seat: Seat) => {
-    const journeyDate = train.availableDate || new Date().toISOString().split('T')[0];
-    return bookings.some(b => 
-      b.trainId === train.id && 
-      b.journeyDate === journeyDate && 
-      b.seats.some(s => s.number === seat.number && s.coachId === coach.id)
-    );
+    const journeyDateProp = journeyDate || train.availableDate || new Date().toISOString().split('T')[0];
+    return bookings.some(b => {
+      const isSameSegment = b.trainId === train.id && b.journeyDate === journeyDateProp;
+      if (!isSameSegment) return false;
+      
+      // Safety check for BOTH new array structure and legacy single seat structure
+      if (b.seats && Array.isArray(b.seats)) {
+        return b.seats.some(s => s.number === seat.number && s.coachId === coach.id);
+      }
+      return (b as any).seatNumber === seat.number && b.coachId === coach.id;
+    });
   };
 
   const handleBook = async () => {

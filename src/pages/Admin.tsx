@@ -145,7 +145,7 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
       </main>
-      
+
     </div>
   );
 }
@@ -304,7 +304,7 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
     const originStation = stations.find(s => s.code === origin)!;
     const destStation = stations.find(s => s.code === destination)!;
     const mappedStops = intermediateStops.map(code => stations.find(s => s.code === code)).filter(Boolean) as Station[];
-    
+
     setIsSubmitting(true);
 
     const train: Train = {
@@ -319,7 +319,7 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
         // Feature 1: Randomized Visual Scarcity 
         // We pick exactly maxConfirmed number of indices to stay unlocked. The rest is locked (Red).
         const unlockedIndices = new Set();
-        
+
         // Randomly pick unique indices to unlock
         while (unlockedIndices.size < Math.min(c.maxConfirmed, c.seats)) {
           const rand = Math.floor(Math.random() * c.seats);
@@ -334,7 +334,7 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
           seats: Array.from({ length: c.seats }, (_, j) => {
             let position: Seat['position'] = 'Lower';
             const seatNum = j + 1;
-            
+
             if (c.type === 'SL' || c.type === '3A') {
               const mod = seatNum % 8;
               if (mod === 1 || mod === 4) position = 'Lower';
@@ -424,31 +424,31 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
           </div>
         </div>
 
-          <div className="space-y-1.5 pt-2">
-            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Intermediate Stops (Multi-Route)</label>
-            <div className="space-y-2">
-                {intermediateStops.map((stopCode, idx) => (
-                   <div key={idx} className="flex items-center gap-2">
-                     <Select value={stopCode} onValueChange={(v) => {
-                         const n = [...intermediateStops];
-                         n[idx] = v;
-                         setIntermediateStops(n);
-                     }}>
-                         <SelectTrigger className="rounded-xl"><SelectValue placeholder="Intermediate Station" /></SelectTrigger>
-                         <SelectContent>
-                             {stations.filter(s => s.code !== origin && s.code !== destination).map(s => <SelectItem key={s.code} value={s.code}>{s.name} ({s.code})</SelectItem>)}
-                         </SelectContent>
-                     </Select>
-                     <Button variant="ghost" size="icon" onClick={() => setIntermediateStops(intermediateStops.filter((_, i) => i !== idx))} className="h-9 w-9 text-destructive hover:bg-destructive/10">
-                        <Trash2 className="h-3.5 w-3.5" />
-                     </Button>
-                   </div>
-                ))}
-                <Button variant="outline" size="sm" onClick={() => setIntermediateStops([...intermediateStops, ''])} className="w-full rounded-xl border-dashed">
-                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Stop
+        <div className="space-y-1.5 pt-2">
+          <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Intermediate Stops (Multi-Route)</label>
+          <div className="space-y-2">
+            {intermediateStops.map((stopCode, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Select value={stopCode} onValueChange={(v) => {
+                  const n = [...intermediateStops];
+                  n[idx] = v;
+                  setIntermediateStops(n);
+                }}>
+                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Intermediate Station" /></SelectTrigger>
+                  <SelectContent>
+                    {stations.filter(s => s.code !== origin && s.code !== destination).map(s => <SelectItem key={s.code} value={s.code}>{s.name} ({s.code})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button variant="ghost" size="icon" onClick={() => setIntermediateStops(intermediateStops.filter((_, i) => i !== idx))} className="h-9 w-9 text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-            </div>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" onClick={() => setIntermediateStops([...intermediateStops, ''])} className="w-full rounded-xl border-dashed">
+              <Plus className="mr-1 h-3.5 w-3.5" /> Add Stop
+            </Button>
           </div>
+        </div>
 
         <div className="space-y-1.5">
           <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1 flex items-center gap-1">

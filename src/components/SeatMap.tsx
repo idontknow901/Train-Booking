@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Train, Coach, Seat } from '@/types/train';
 import { useTrainContext } from '@/context/TrainContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Ticket, User, MapPin } from 'lucide-react';
+import { ArrowLeft, Ticket, User, MapPin, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import BookingConfirmation from './BookingConfirmation';
 import { Booking } from '@/types/train';
@@ -26,7 +27,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
   const [selectedOrigin, setSelectedOrigin] = useState(origin);
   const [selectedDest, setSelectedDest] = useState(destination);
   const [selectedCoach, setSelectedCoach] = useState(train.coaches[0].id);
-  const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
+  const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [username, setUsername] = useState('');
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [isBooking, setIsBooking] = useState(false);
@@ -87,39 +88,55 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
       return;
     }
 
-    setIsBooking(true);
-
-    const userBookingsCount = bookings.filter(b => b.username === username.trim() && b.trainId === train.id && b.journeyDate === journeyDate).length;
-    if (userBookingsCount >= 4) {
-      toast.error('Maximum limit of 4 seats per train reached.');
-      setIsBooking(false);
+    if (selectedSeats.length === 0) {
+      toast.error('Please select at least one seat');
       return;
     }
 
+    setIsBooking(true);
+
     try {
-      const booking = await bookSeat(
+      let firstBooking: Booking | null = null;
+      
+      for (const seat of selectedSeats) {
+        const booking = await bookSeat(
           train.id, 
           selectedCoach, 
           coach.type,
-          selectedSeat?.id || null, 
+          seat.id, 
           username.trim(), 
           journeyDate, 
           selectedOrigin, 
           selectedDest
-      );
-      if (booking) {
-        toast.success(`Ticket booked! PNR: ${booking.pnr}`);
-        setConfirmedBooking(booking);
-        setUsername('');
-      } else {
-        toast.error('Seat already booked or system error. Please try again.');
+        );
+        if (booking && !firstBooking) firstBooking = booking;
       }
-    } catch (error) {
-      console.error("Booking error:", error);
-      toast.error('Booking failed. Check your connection and try again.');
+
+      if (firstBooking) {
+        setConfirmedBooking(firstBooking);
+        toast.success(`Succesfully booked ${selectedSeats.length} seats!`);
+      } else {
+        toast.error('Booking failed. Check your connection and try again.');
+      }
+    } catch (e: any) {
+      toast.error('Booking failed: ' + e.message);
     } finally {
       setIsBooking(false);
     }
+  };
+
+  const handleSeatClick = (seat: Seat) => {
+    setSelectedSeats(prev => {
+        const isAlreadySelected = prev.find(s => s.id === seat.id);
+        if (isAlreadySelected) {
+            return prev.filter(s => s.id !== seat.id);
+        }
+        if (prev.length >= 4) {
+            toast.error('You can only book up to 4 seats at once.');
+            return prev;
+        }
+        return [...prev, seat];
+    });
   };
 
   const handleTimelineClick = (code: string) => {
@@ -132,7 +149,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
     } else if (idx > originIdx) {
       setSelectedDest(code);
     }
-    setSelectedSeat(null);
+    setSelectedSeats([]);
   };
 
   if (confirmedBooking) {
@@ -158,68 +175,107 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
           ⚠ Booking is currently closed for maintenance
         </div>
       )}
-
-      {/* Journey Configuration Header */}
-      <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-6 shadow-xl space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent flex items-center gap-2">
-              <MapPin className="h-3 w-3" /> Journey Configuration
-            </h3>
-            <p className="text-sm text-muted-foreground font-medium">Customize your boarding and destination stations below</p>
-          </div>
-
-          <div className="flex items-center gap-2 bg-background p-1.5 rounded-2xl border border-border shadow-inner">
-             <Select value={selectedOrigin} onValueChange={(v) => { setSelectedOrigin(v); setSelectedSeat(null); }}>
-                 <SelectTrigger className="h-10 text-xs font-medium border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
-                 <SelectContent>
-                     {train.route.map((s, idx) => (
-                         <SelectItem key={s.code} value={s.code} disabled={idx >= train.route.findIndex(x => x.code === selectedDest)}>{s.name} ({s.code})</SelectItem>
-                     ))}
-                 </SelectContent>
-             </Select>
-             <div className="h-8 w-px bg-border mx-1" />
-             <Select value={selectedDest} onValueChange={(v) => { setSelectedDest(v); setSelectedSeat(null); }}>
-                 <SelectTrigger className="h-10 text-xs font-medium border-none bg-transparent hover:bg-muted/50 transition-colors w-40 px-4"><SelectValue /></SelectTrigger>
-                 <SelectContent>
-                     {train.route.map((s, idx) => (
-                         <SelectItem key={s.code} value={s.code} disabled={idx <= train.route.findIndex(x => x.code === selectedOrigin)}>{s.name} ({s.code})</SelectItem>
-                     ))}
-                 </SelectContent>
-             </Select>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Boarding Card */}
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-[2rem] opacity-20 group-hover:opacity-30 transition duration-500 blur"></div>
+          <div className="relative bg-card rounded-[2rem] p-6 shadow-xl border border-border/50">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="p-1.5 rounded-lg bg-emerald-500/10">
+                  <MapPin className="h-4 w-4 text-emerald-500" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-600/70">BOARDING STATION</span>
+              </div>
+              
+              <Select value={selectedOrigin} onValueChange={(v) => { setSelectedOrigin(v); setSelectedSeats([]); }}>
+                <SelectTrigger className="h-auto border-none p-0 bg-transparent text-2xl font-black tracking-tighter focus:ring-0 leading-tight">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border bg-card shadow-2xl">
+                  {train.route.map((s, idx) => (
+                    <SelectItem key={s.code} value={s.code} disabled={idx >= train.route.findIndex(x => x.code === selectedDest)} className="rounded-xl font-bold py-3">
+                      {s.name} <span className="text-xs opacity-50 ml-1 font-mono uppercase">({s.code})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <div className="mt-4 flex items-center gap-3">
+                <div className="h-1 w-12 rounded-full bg-emerald-500/20" />
+                <span className="text-[10px] font-black font-mono text-muted-foreground tracking-widest uppercase">ORIGIN PORT</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Multi-Stop Timeline UI */}
-        <div className="relative pt-2 pb-6 px-4">
-          <div className="relative flex items-center justify-between before:absolute before:left-0 before:right-0 before:h-1 before:bg-muted before:top-1/2 before:-translate-y-1/2 before:z-0">
-             {train.route.map((stop, idx) => {
-                const isOrigin = stop.code === selectedOrigin;
-                const isDest = stop.code === selectedDest;
-                const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
-                const destIdx = train.route.findIndex(s => s.code === selectedDest);
-                
-                let dotColor = 'bg-muted border-border';
-                if (idx >= originIdx && idx <= destIdx) dotColor = 'bg-accent border-accent ring-4 ring-accent/10';
-
-                return (
-                  <button 
-                    key={stop.code} 
-                    onClick={() => handleTimelineClick(stop.code)}
-                    className="relative z-10 flex flex-col items-center group"
-                  >
-                    <div className={`h-4 w-4 rounded-full ${dotColor} flex items-center justify-center transition-all duration-300 ${isOrigin || isDest ? 'scale-125 ring-8 ring-accent/10 bg-accent' : 'group-hover:scale-125 bg-muted'}`} />
-                    <div className="absolute top-8 flex flex-col items-center">
-                      <span className={`text-[10px] uppercase font-medium tracking-widest whitespace-nowrap transition-colors ${isOrigin || isDest ? 'text-accent font-bold' : 'text-muted-foreground group-hover:text-foreground'}`}>{stop.code}</span>
-                    </div>
-                  </button>
-                );
-             })}
+        {/* Destination Card */}
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-[#213d77] rounded-[2rem] opacity-20 group-hover:opacity-30 transition duration-500 blur"></div>
+          <div className="relative bg-[#213d77] rounded-[2rem] p-6 shadow-xl border-none">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="p-1.5 rounded-lg bg-white/10 text-white/70">
+                  <MapPin className="h-4 w-4" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/50">DROPPING STATION</span>
+              </div>
+              
+              <Select value={selectedDest} onValueChange={(v) => { setSelectedDest(v); setSelectedSeats([]); }}>
+                <SelectTrigger className="h-auto border-none p-0 bg-transparent text-2xl font-black tracking-tighter focus:ring-0 leading-tight text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border bg-card shadow-2xl">
+                  {train.route.map((s, idx) => (
+                    <SelectItem key={s.code} value={s.code} disabled={idx <= train.route.findIndex(x => x.code === selectedOrigin)} className="rounded-xl font-bold py-3">
+                      {s.name} <span className="text-xs opacity-50 ml-1 font-mono uppercase">({s.code})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <div className="mt-4 flex items-center gap-3">
+                <div className="h-1 w-12 rounded-full bg-white/20" />
+                <span className="text-[10px] font-black font-mono text-white/40 tracking-widest uppercase">END TERMINAL</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <Tabs value={selectedCoach} onValueChange={v => { setSelectedCoach(v); setSelectedSeat(null); }}>
+      {/* Modern Multi-Stop Timeline */}
+      <div className="rounded-[2rem] border border-border bg-card p-8 shadow-sm overflow-hidden relative group transition-all hover:shadow-md">
+        <div className="absolute top-0 left-0 w-2 h-full bg-accent opacity-20 group-hover:opacity-40 transition-opacity" />
+        <div className="relative flex items-center justify-between before:absolute before:left-0 before:right-0 before:h-2 before:bg-muted/50 before:top-1/2 before:-translate-y-1/2 before:rounded-full before:z-0 px-4">
+           {train.route.map((stop, idx) => {
+              const isOrigin = stop.code === selectedOrigin;
+              const isDest = stop.code === selectedDest;
+              const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
+              const destIdx = train.route.findIndex(s => s.code === selectedDest);
+              
+              let dotColor = 'bg-muted/80 border-border';
+              if (idx >= originIdx && idx <= destIdx) dotColor = 'bg-emerald-500 border-emerald-500 scale-125 ring-4 ring-emerald-500/20';
+              if (isDest) dotColor = 'bg-blue-500 border-blue-500 scale-150 ring-8 ring-blue-500/20';
+
+              return (
+                <button 
+                  key={stop.code} 
+                  onClick={() => handleTimelineClick(stop.code)}
+                  className="relative z-10 flex flex-col items-center group/stop"
+                >
+                  <div className={`h-4 w-4 rounded-full border-4 ${dotColor} flex items-center justify-center transition-all duration-500 ${isOrigin || isDest ? 'animate-pulse' : 'hover:scale-125'}`} />
+                  <div className="absolute top-8 flex flex-col items-center">
+                    <span className={`text-[9px] font-black uppercase tracking-tighter whitespace-nowrap transition-colors bg-card px-2 py-0.5 rounded-full border border-border/50 ${isOrigin || isDest ? 'opacity-100 scale-110 shadow-sm' : 'opacity-40 group-hover/stop:opacity-100'}`}>
+                      {stop.name}
+                    </span>
+                  </div>
+                </button>
+              );
+           })}
+        </div>
+      </div>
+
+      <Tabs value={selectedCoach} onValueChange={v => { setSelectedCoach(v); setSelectedSeats([]); }}>
         <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted p-1">
           {train.coaches.map(c => {
             const rCheck = engine.isValidRoute(selectedOrigin, selectedDest);
@@ -231,7 +287,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
             }).length;
 
             return (
-              <TabsTrigger key={c.id} value={c.id} className="flex-1 min-w-[80px] data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
+              <TabsTrigger key={c.id} value={c.id} onClick={() => setSelectedSeats([])} className="flex-1 min-w-[80px] data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
                 <span className="font-semibold">{c.type}</span>
                 <span className="ml-1 text-xs opacity-75">({availInCoach})</span>
               </TabsTrigger>
@@ -243,8 +299,8 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
           <TabsContent key={c.id} value={c.id}>
             <SeatGrid 
               coach={c} 
-              selectedSeat={selectedSeat} 
-              onSelectSeat={s => setSelectedSeat(s.id === selectedSeat?.id ? null : s)} 
+              selectedSeats={selectedSeats} 
+              onSelectSeat={handleSeatClick} 
               engine={engine}
               train={train}
               bookings={bookings}
@@ -256,45 +312,41 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
         ))}
       </Tabs>
 
-      <div className="flex gap-4 text-sm flex-wrap">
-        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-emerald-500/20 border-emerald-500/50" /> Available (CNF)</span>
-        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-amber-500/20 border-amber-500/50" /> RAC (Shared)</span>
-        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-destructive/20 border-destructive/50" /> Fully Booked</span>
-        <span className="flex items-center gap-3 text-xs opacity-70 italic ml-auto">* Colors dynamic to selection</span>
-      </div>
-
-      <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
-        <h3 className="mb-3 font-bold text-foreground flex items-center gap-2">
-          <Ticket className="h-5 w-5 text-accent" />
-          {selectedSeat ? `Request Seat #${selectedSeat.number} (${selectedSeat.position})` : 'Join Auto-Queue (RAC/WL)'}
-        </h3>
-        <p className="mb-5 text-sm text-muted-foreground">
-          {selectedSeat 
-            ? `Booking from ${selectedOrigin} to ${selectedDest}. Confirmed seat selected.`
-            : `Booking from ${selectedOrigin} to ${selectedDest}. Auto-assigned status based on segment capacity.`}
-        </p>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
-            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Roblox Username"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="pl-10 h-11"
-              maxLength={50}
-            />
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-xl sticky bottom-4 z-40 animate-in slide-in-from-bottom-2">
+        <div className="flex flex-col md:flex-row items-end justify-between gap-6">
+          <div className="flex-1 w-full space-y-4">
+             <div className="flex flex-wrap gap-2">
+                {selectedSeats.length > 0 ? (
+                    selectedSeats.map(s => (
+                        <Badge key={s.id} variant="secondary" className="px-3 py-1 bg-accent/10 border-accent/20 text-accent font-bold">
+                            {coach.type} - {s.number} ({s.position})
+                        </Badge>
+                    ))
+                ) : (
+                    <p className="text-sm font-medium text-muted-foreground italic">No seats selected yet • Max 4 seats</p>
+                )}
+             </div>
+             
+             <div className="flex flex-col md:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Enter Roblox Username..."
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    className="pl-10 h-12 rounded-xl bg-background border-border focus:ring-accent"
+                  />
+                </div>
+                <Button
+                  onClick={handleBook}
+                  disabled={isBooking || selectedSeats.length === 0}
+                  className="h-12 px-8 font-black gap-2 w-full md:w-auto shadow-lg hover:scale-105 transition-all bg-[#1a365d] hover:bg-[#2c5282] rounded-xl"
+                >
+                  {isBooking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ticket className="h-4 w-4" />}
+                  BOOK {selectedSeats.length > 0 ? `${selectedSeats.length} SEATS` : 'NOW'}
+                </Button>
+             </div>
           </div>
-          <Button
-            onClick={handleBook}
-            disabled={!username.trim() || !settings.bookingOpen || isBooking}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold h-11 px-8"
-          >
-            {isBooking ? (
-              <>Processing...</>
-            ) : (
-              <><Ticket className="mr-2 h-4 w-4" /> {selectedSeat ? 'Confirm Seat' : 'Book Auto-Ticket'}</>
-            )}
-          </Button>
         </div>
       </div>
     </div>
@@ -303,7 +355,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
 
 function SeatGrid({ 
   coach, 
-  selectedSeat, 
+  selectedSeats, 
   onSelectSeat, 
   engine, 
   train,
@@ -313,7 +365,7 @@ function SeatGrid({
   selectedDest 
 }: { 
   coach: Coach; 
-  selectedSeat: Seat | null; 
+  selectedSeats: Seat[]; 
   onSelectSeat: (s: Seat) => void;
   engine: GameTrainBookingSystem;
   train: Train;
@@ -334,28 +386,53 @@ function SeatGrid({
       return isOverlapping && b.coachType === coach.type;
   });
 
-  const currentRAC = classBookings.filter(b => b.status === 'RAC').length;
-  const currentWL = classBookings.filter(b => b.status === 'WL').length;
+  const currentRAC = classBookings.filter(b => b.currentStatus === 'RAC').length;
+  const currentWL = classBookings.filter(b => b.currentStatus === 'WL').length;
   const availability = engine.getAvailabilityForSegment(rCheck.startIndex, rCheck.endIndex);
 
+  // --- SEEDED SCARCITY SYSTEM ---
+  const selectableSeatIds = useMemo(() => {
+    // 1. If cap is 0, nothing is selectable
+    if ((coach.maxConfirmed || 0) <= 0) return new Set<string>();
+
+    // 2. Deterministic Shuffle using Coach ID as Seed
+    const seedString = coach.id + train.id;
+    let seed = 0;
+    for(let i=0; i<seedString.length; i++) seed += seedString.charCodeAt(i);
+    
+    // Custom random generator for consistent shuffle
+    const seededRandom = () => {
+        const x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+    };
+
+    const allPhysicalSeats = coach.seats;
+    const shuffled = [...allPhysicalSeats].sort(() => seededRandom() - 0.5);
+    
+    // Only pick EXACTLY maxConfirmed seats to be "Sales Open"
+    return new Set(shuffled.slice(0, coach.maxConfirmed).map(s => s.id));
+  }, [coach.id, coach.maxConfirmed]);
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm overflow-x-auto overflow-y-hidden">
         <div className="grid gap-2 min-w-[500px]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(50px, 1fr))` }}>
           {coach.seats.map(seat => {
-            const isSelected = selectedSeat?.id === seat.id;
+            const isSelected = selectedSeats.find(s => s.id === seat.id);
             const seatBookings = engine.seats.find(es => es.id === seat.id)?.bookings.filter(b => 
                GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
             ) || [];
             
             const isOccupied = seatBookings.length > 0;
             const isRAC = seatBookings.some(b => b.status === 'RAC');
-            const isUnavailable = isOccupied || seat.isLocked;
+            const isSelectable = selectableSeatIds.has(seat.id);
+            const isLocked = !isSelectable && !isOccupied; // Empty but not for sale
+            const isUnavailable = isOccupied || seat.isLocked || isLocked;
             
             let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20'; // Green
-            if (isUnavailable) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed'; // Red
+            if (isLocked) cls = 'bg-destructive/5 border-destructive/10 text-destructive/40 bg-stripes pointer-events-none opacity-40 cursor-not-allowed'; // Greyish Red / Locked
+            if (isOccupied) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed'; // Real Red / Booked
             if (isRAC) cls = 'bg-amber-500/10 border-amber-500/30 text-amber-600 cursor-not-allowed'; // Yellow for RAC
-            if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10'; // Blue for selection
+            if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10 ring-4 ring-accent/20'; // Blue for selection
 
             let displayStatus = String(seat.number);
             let displaySub = seat.position.substring(0, 1) + (seat.position.includes(' ') ? seat.position.split(' ')[1].substring(0, 1) : '');
@@ -370,6 +447,7 @@ function SeatGrid({
               >
                 <span className="text-lg font-medium tracking-tighter opacity-80">{displayStatus}</span>
                 {!isUnavailable && <span className="text-[10px] uppercase font-black tracking-widest mt-1 text-accent leading-none">{seat.position}</span>}
+                {isLocked && <div className="absolute top-1 right-1 opacity-20"><svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div>}
               </button>
             );
           })}

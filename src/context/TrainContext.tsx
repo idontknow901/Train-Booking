@@ -259,7 +259,10 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         const destIdx = trainData.route.findIndex(s => s.code === destination);
         const routeStops = trainData.route.slice(originIdx, destIdx + 1).map(s => s.code);
 
-        const newBooking = {
+        // 5. Generate Full Status Snapshot
+        const initialStatusStr = resultTicket.status === 'CNF' ? 'CNF' : `${resultTicket.status} ${resultTicket.queueNumber}`;
+
+        const newBooking: Booking = {
           pnr,
           username,
           trainId,
@@ -274,7 +277,9 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
           destination,
           routeStops,
           bookedAt: new Date().toISOString(),
-          status: resultTicket.status,
+          status: resultTicket.status, // Legacy
+          initialStatus: initialStatusStr,
+          currentStatus: resultTicket.status,
           queueNumber: resultTicket.queueNumber
         } as unknown as Booking;
 
@@ -300,15 +305,84 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, [settings.bookingOpen, bookings]);
  
-  const cancelBooking = useCallback(async (pnr: string) => {
+  const promoteQueue = useCallback(async (trainId: string, journeyDate: string, coachType: string) => {
     try {
-      await withTimeout(deleteDoc(doc(db, 'bookings', pnr)), 'Cancelling booking');
-      console.log('Ticket cancelled:', pnr);
+       const trainSnap = await getDoc(doc(db, 'trains', trainId));
+       if (!trainSnap.exists()) return;
+       const trainData = trainSnap.data() as Train;
+
+       // 1. Gather class config
+       const classCoaches = trainData.coaches.filter(c => c.type === coachType);
+       const classPhysicalSeats: { coachId: string; seat: Seat }[] = [];
+       classCoaches.forEach(coach => {
+         coach.seats.forEach(seat => classPhysicalSeats.push({ coachId: coach.id, seat }));
+       });
+       const physicalSeatIds = classPhysicalSeats.map(s => s.seat.id);
+       const SOFT_CAP = classCoaches[0]?.maxConfirmed || Math.floor(classPhysicalSeats.length * 0.9);
+       const RAC_CAP = SOFT_CAP + (coachType === 'SL' ? 8 : 4);
+
+       const engine = new GameTrainBookingSystem(
+         trainData.route.map(s => s.code),
+         physicalSeatIds,
+         SOFT_CAP,
+         RAC_CAP
+       );
+
+       // 2. Fetch current bookings
+       const bookingsSnap = await getDocs(collection(db, 'bookings'));
+       const allBookings = bookingsSnap.docs.map(d => d.data() as Booking);
+       const classBookings = allBookings.filter(b => b.trainId === trainId && b.journeyDate === journeyDate && b.coachType === coachType);
+       const sorted = [...classBookings].sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
+
+       // 3. Batch re-process
+       for (const b of sorted) {
+          // Resolve current seatId to prefer it during re-booking
+          const currentSeatId = classPhysicalSeats.find(cps => cps.coachId === b.coachId && cps.seat.number === b.seatNumber)?.seat.id || null;
+          
+          const res = engine.bookTicket(b.username, b.origin, b.destination, currentSeatId);
+          
+          let assignedCoachId = '';
+          let assignedSeatNumber = 0;
+          let assignedSeatPosition = 'Pending';
+
+          if (res.seatId) {
+             const sData = classPhysicalSeats.find(s => s.seat.id === res.seatId);
+             if (sData) {
+                assignedCoachId = sData.coachId;
+                assignedSeatNumber = sData.seat.number;
+                assignedSeatPosition = sData.seat.position;
+             }
+          }
+
+          if (res.status !== b.currentStatus || assignedSeatNumber !== b.seatNumber) {
+             await updateDoc(doc(db, 'bookings', b.pnr), {
+               currentStatus: res.status,
+               status: res.status, // Legacy
+               seatNumber: assignedSeatNumber,
+               coachId: assignedCoachId,
+               seatPosition: assignedSeatPosition,
+               queueNumber: res.queueNumber
+             });
+          }
+       }
     } catch (e) {
-      console.error('Cancel error:', e);
-      throw e;
+       console.error('Promotion Engine Error:', e);
     }
   }, []);
+
+  const cancelBooking = useCallback(async (pnr: string) => {
+    try {
+      const bookingToCancel = bookings.find(b => b.pnr === pnr);
+      await withTimeout(deleteDoc(doc(db, 'bookings', pnr)), 'Cancelling booking');
+      
+      if (bookingToCancel) {
+        await promoteQueue(bookingToCancel.trainId, bookingToCancel.journeyDate, bookingToCancel.coachType);
+      }
+    } catch (e) {
+      console.error('cancelBooking: ERROR', e);
+      throw e;
+    }
+  }, [bookings, promoteQueue]);
 
   const resetAllSeats = useCallback(async () => {
     try {

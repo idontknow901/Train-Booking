@@ -109,15 +109,18 @@ const MyBookings = () => {
                 </div>
                 
                 <div className="flex flex-col items-end gap-2">
-                   <Badge variant="outline" className={`border-none font-black text-xs px-4 py-1.5 shadow-sm ${
-                      foundBooking.status === 'CNF' ? 'bg-emerald-500/10 text-emerald-600' : 
-                      foundBooking.status === 'RAC' ? 'bg-amber-500/10 text-amber-600' : 
-                      'bg-destructive/10 text-destructive'
-                   }`}>
-                     {foundBooking.status === 'CNF' ? 'CONFIRMED' : `${foundBooking.status} QUEUE: ${foundBooking.queueNumber}`}
-                   </Badge>
-                   <p className="text-[10px] font-black uppercase text-muted-foreground">Status tracking live</p>
-                </div>
+                    <Badge variant="outline" className={`border-none font-black text-xs px-4 py-1.5 shadow-sm ${
+                       foundBooking.currentStatus === 'CNF' ? 'bg-emerald-500/10 text-emerald-600' : 
+                       foundBooking.currentStatus === 'RAC' ? 'bg-amber-500/10 text-amber-600' : 
+                       'bg-destructive/10 text-destructive'
+                    }`}>
+                      {foundBooking.currentStatus === 'CNF' ? 'CONFIRMED' : `${foundBooking.currentStatus} Q-${foundBooking.queueNumber}`}
+                    </Badge>
+                    <div className="flex flex-col items-end">
+                       <p className="text-[10px] font-black uppercase text-muted-foreground">Status tracking live</p>
+                       <p className="text-[9px] font-bold text-muted-foreground/60 uppercase mt-0.5">Booked as: <span className="text-accent">{foundBooking.initialStatus}</span></p>
+                    </div>
+                 </div>
               </div>
             </CardHeader>
 

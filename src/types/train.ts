@@ -12,6 +12,8 @@ export interface Train {
   arrivalTime: string;
   coaches: Coach[];
   availableDate?: string;
+  maxConfirmedSeats?: number;
+  racLimit?: number;
 }
 
 export interface Coach {
@@ -47,8 +49,10 @@ export interface Booking {
   destination: string;
   routeStops?: string[];
   bookedAt: string;
-  status?: string;
-  queueNumber?: number;
+  status?: string; // Legacy field for single-status checks if needed
+  initialStatus: string;  // Status at purchase (e.g. WL 5)
+  currentStatus: string;  // Dynamic status (e.g. CNF)
+  queueNumber: number;
 }
 
 export interface GlobalSettings {

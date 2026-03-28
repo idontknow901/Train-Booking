@@ -142,27 +142,6 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
             <p className="text-sm text-muted-foreground">{journeyDate}</p>
           </div>
         </div>
-
-        {/* Dynamic Origin / Dest Selectors */}
-        <div className="flex items-center gap-2 bg-muted/30 p-2 rounded-xl border border-border">
-           <Select value={selectedOrigin} onValueChange={(v) => { setSelectedOrigin(v); setSelectedSeat(null); }}>
-               <SelectTrigger className="h-8 text-xs font-bold bg-background shadow-sm w-32"><SelectValue /></SelectTrigger>
-               <SelectContent>
-                   {train.route.map((s, idx) => (
-                       <SelectItem key={s.code} value={s.code} disabled={idx >= train.route.findIndex(x => x.code === selectedDest)}>{s.name} ({s.code})</SelectItem>
-                   ))}
-               </SelectContent>
-           </Select>
-           <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180" />
-           <Select value={selectedDest} onValueChange={(v) => { setSelectedDest(v); setSelectedSeat(null); }}>
-               <SelectTrigger className="h-8 text-xs font-bold bg-background shadow-sm w-32"><SelectValue /></SelectTrigger>
-               <SelectContent>
-                   {train.route.map((s, idx) => (
-                       <SelectItem key={s.code} value={s.code} disabled={idx <= train.route.findIndex(x => x.code === selectedOrigin)}>{s.name} ({s.code})</SelectItem>
-                   ))}
-               </SelectContent>
-           </Select>
-        </div>
       </div>
 
       {!settings.bookingOpen && (
@@ -220,9 +199,9 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
                     onClick={() => handleTimelineClick(stop.code)}
                     className="relative z-10 flex flex-col items-center group"
                   >
-                    <div className={`h-5 w-5 rounded-full border-2 ${dotColor} flex items-center justify-center transition-all duration-300 ${isOrigin || isDest ? 'scale-125 ring-8 ring-accent/20 bg-background' : 'group-hover:scale-125 bg-muted'}`} />
+                    <div className={`h-4 w-4 rounded-full ${dotColor} flex items-center justify-center transition-all duration-300 ${isOrigin || isDest ? 'scale-125 ring-8 ring-accent/10 bg-accent' : 'group-hover:scale-125 bg-muted'}`} />
                     <div className="absolute top-8 flex flex-col items-center">
-                      <span className={`text-[10px] uppercase font-black tracking-widest whitespace-nowrap transition-colors ${isOrigin || isDest ? 'text-accent' : 'text-muted-foreground group-hover:text-foreground'}`}>{stop.code}</span>
+                      <span className={`text-[10px] uppercase font-medium tracking-widest whitespace-nowrap transition-colors ${isOrigin || isDest ? 'text-accent font-bold' : 'text-muted-foreground group-hover:text-foreground'}`}>{stop.code}</span>
                     </div>
                   </button>
                 );
@@ -366,8 +345,8 @@ function SeatGrid({
                 disabled={isUnavailable}
                 title={`${seat.number} - ${seat.position}${isOccupied ? ` (Booked for this segment)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
               >
-                <span className="text-2xl font-black tracking-tighter">{displayStatus}</span>
-                {!isUnavailable && <span className="text-xs uppercase font-black opacity-80 tracking-widest mt-0.5">{seat.position}</span>}
+                <span className="text-2xl font-bold tracking-tighter">{displayStatus}</span>
+                {!isUnavailable && <span className="text-xs uppercase font-medium opacity-80 tracking-widest mt-0.5">{seat.position}</span>}
               </button>
             );
           })}
@@ -380,8 +359,8 @@ function SeatGrid({
             <span className="text-[10px] uppercase font-black text-amber-600 tracking-widest leading-none">Segment Status</span>
             <span className="text-sm font-black text-amber-700">RAC Queue</span>
           </div>
-          <p className="font-mono text-2xl font-black text-amber-600">
-            {currentRAC > 0 ? `RAC ${currentRAC}` : 'AVAILABLE'}
+          <p className="font-mono text-2xl font-bold text-amber-600">
+            {currentRAC > 0 ? `RAC ${currentRAC}` : `RAC AVBL 10`}
           </p>
         </div>
         <div className="flex items-center justify-between p-4 rounded-2xl border border-destructive/20 bg-destructive/5">
@@ -389,8 +368,8 @@ function SeatGrid({
             <span className="text-[10px] uppercase font-black text-destructive tracking-widest leading-none">Segment Status</span>
             <span className="text-sm font-black text-destructive">Waitlist</span>
           </div>
-          <p className="font-mono text-2xl font-black text-destructive">
-             {currentWL > 0 ? `WL ${currentWL}` : 'AVAILABLE'}
+          <p className="font-mono text-2xl font-bold text-destructive">
+             {currentWL > 0 ? `WL ${currentWL}` : 'WL AVAILABLE'}
           </p>
         </div>
       </div>

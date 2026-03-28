@@ -11,6 +11,8 @@ export async function sendBookingWebhook(booking: Booking, train: Train) {
   const titleSuffix = booking.status === 'CNF' ? 'Confirmed' : booking.status === 'RAC' ? 'RAC Assigned' : 'Waitlisted';
   const color = booking.status === 'CNF' ? 0x10b981 : booking.status === 'RAC' ? 0xf59e0b : 0xef4444; // Green, Yellow, Red
  
+  const getStationName = (code: string) => train.route.find(s => s.code === code)?.name || code;
+ 
   const embed = {
     title: `🚂 New Train Booking ${titleSuffix}!`,
     color: color,
@@ -41,14 +43,14 @@ export async function sendBookingWebhook(booking: Booking, train: Train) {
         inline: false,
       },
       {
-        name: '🛫 Boarding & 🛬 Leaving',
-        value: `Boarding: \`${booking.origin}\`\nLeaving: \`${booking.destination}\``,
+        name: '🚉 Journey Details',
+        value: `Boarding: \`${getStationName(booking.origin)}\`\nDestination: \`${getStationName(booking.destination)}\``,
         inline: true,
       },
       {
         name: '🛤️ Intermediate Stops',
         value: booking.routeStops?.length && booking.routeStops.length > 2 
-          ? `\`${booking.routeStops.slice(1, -1).join(' -> ')}\``
+          ? `\`${booking.routeStops.slice(1, -1).map(code => getStationName(code)).join(' -> ')}\``
           : '*No intermediate stops*',
         inline: false,
       },

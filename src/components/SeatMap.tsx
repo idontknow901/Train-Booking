@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import BookingConfirmation from './BookingConfirmation';
 import { Booking } from '@/types/train';
+import { GameTrainBookingSystem } from '@/lib/bookingEngine';
 
 interface SeatMapProps {
   train: Train;
@@ -19,7 +20,7 @@ interface SeatMapProps {
 }
 
 export default function SeatMap({ train: initialTrain, journeyDate, origin, destination, onBack }: SeatMapProps) {
-  const { bookSeat, settings, trains } = useTrainContext();
+  const { bookSeat, settings, trains, bookings } = useTrainContext();
   const train = trains.find(t => t.id === initialTrain.id) || initialTrain;
 
   const [selectedOrigin, setSelectedOrigin] = useState(origin);
@@ -29,6 +30,49 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
   const [username, setUsername] = useState('');
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [isBooking, setIsBooking] = useState(false);
+
+  // Initialize Engine for Live Segmented Availability Check
+  const allPhysicalSeats: { coachId: string; seat: Seat }[] = [];
+  train.coaches.forEach(coach => {
+    coach.seats.forEach(seat => allPhysicalSeats.push({ coachId: coach.id, seat }));
+  });
+  const physicalSeatIds = allPhysicalSeats.map(s => s.seat.id);
+
+  // Constants (should match TrainContext)
+  const SOFT_CAP = 30;
+  const RAC_CAP = 40;
+
+  const engine = new GameTrainBookingSystem(
+    train.route.map(s => s.code),
+    physicalSeatIds,
+    SOFT_CAP,
+    RAC_CAP
+  );
+
+  // Hydrate engine with existing bookings
+  const currentTrainBookings = bookings.filter(b => b.trainId === train.id && b.journeyDate === journeyDate);
+  const sortedBookings = currentTrainBookings.sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
+
+  for (const existing of sortedBookings) {
+    const rCheck = engine.isValidRoute(existing.origin, existing.destination);
+    if (rCheck.valid) {
+      engine.bookings.push({
+        playerId: existing.username,
+        startStation: existing.origin, endStation: existing.destination,
+        startIndex: rCheck.startIndex, endIndex: rCheck.endIndex,
+        status: (existing as any).status || 'CNF',
+        seatId: existing.seatNumber ? `${existing.coachId}-${existing.seatNumber}` : null,
+        queueNumber: (existing as any).queueNumber || 0
+      });
+      if (existing.seatNumber) {
+        const realSeatId = allPhysicalSeats.find(s => s.coachId === existing.coachId && s.seat.number === existing.seatNumber)?.seat.id;
+        if (realSeatId) {
+          const eSeat = engine.seats.find(s => s.id === realSeatId);
+          if (eSeat) eSeat.bookings.push(engine.bookings[engine.bookings.length - 1]);
+        }
+      }
+    }
+  }
 
   const coach = train.coaches.find(c => c.id === selectedCoach)!;
 
@@ -67,8 +111,19 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
     } finally {
       setIsBooking(false);
     }
+  };
 
+  const handleTimelineClick = (code: string) => {
+    const idx = train.route.findIndex(s => s.code === code);
+    const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
+    const destIdx = train.route.findIndex(s => s.code === selectedDest);
 
+    if (idx < destIdx) {
+      setSelectedOrigin(code);
+    } else if (idx > originIdx) {
+      setSelectedDest(code);
+    }
+    setSelectedSeat(null);
   };
 
   if (confirmedBooking) {
@@ -119,7 +174,7 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
       {/* Multi-Stop Timeline UI */}
       <div className="rounded-xl border border-border bg-card p-5 overflow-hidden">
         <h3 className="mb-4 font-bold text-foreground text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          <MapPin className="h-4 w-4" /> Journey Timeline
+          <MapPin className="h-4 w-4" /> Journey Timeline (Click to Select)
         </h3>
         <div className="relative flex items-center justify-between before:absolute before:left-0 before:right-0 before:h-0.5 before:bg-muted before:top-1/2 before:-translate-y-1/2 before:z-0">
            {train.route.map((stop, idx) => {
@@ -132,12 +187,16 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
               if (idx >= originIdx && idx <= destIdx) dotColor = 'bg-accent border-accent';
 
               return (
-                <div key={stop.code} className="relative z-10 flex flex-col items-center gap-2 group">
-                  <div className={`h-4 w-4 rounded-full border-2 ${dotColor} flex items-center justify-center transition-all ${isOrigin || isDest ? 'scale-125 ring-4 ring-accent/20' : ''}`} />
+                <button 
+                  key={stop.code} 
+                  onClick={() => handleTimelineClick(stop.code)}
+                  className="relative z-10 flex flex-col items-center gap-2 group cursor-pointer"
+                >
+                  <div className={`h-4 w-4 rounded-full border-2 ${dotColor} flex items-center justify-center transition-all ${isOrigin || isDest ? 'scale-125 ring-4 ring-accent/20' : 'group-hover:scale-110'}`} />
                   <div className="absolute top-6 flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground whitespace-nowrap">{stop.code}</span>
+                    <span className={`text-[10px] uppercase font-bold whitespace-nowrap ${isOrigin || isDest ? 'text-accent' : 'text-muted-foreground'}`}>{stop.code}</span>
                   </div>
-                </div>
+                </button>
               );
            })}
         </div>
@@ -147,11 +206,18 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
       <Tabs value={selectedCoach} onValueChange={v => { setSelectedCoach(v); setSelectedSeat(null); }}>
         <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted p-1">
           {train.coaches.map(c => {
-            const avail = c.seats.filter(s => !s.isBooked && !s.isLocked).length;
+            const rCheck = engine.isValidRoute(selectedOrigin, selectedDest);
+            const availInCoach = c.seats.filter(s => {
+              const isOccupied = engine.seats.find(es => es.id === s.id)?.bookings.some(b => 
+                GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
+              );
+              return !isOccupied && !s.isLocked;
+            }).length;
+
             return (
               <TabsTrigger key={c.id} value={c.id} className="flex-1 min-w-[80px] data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
                 <span className="font-semibold">{c.type}</span>
-                <span className="ml-1 text-xs opacity-75">({avail})</span>
+                <span className="ml-1 text-xs opacity-75">({availInCoach})</span>
               </TabsTrigger>
             );
           })}
@@ -159,15 +225,22 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
 
         {train.coaches.map(c => (
           <TabsContent key={c.id} value={c.id}>
-            <SeatGrid coach={c} selectedSeat={selectedSeat} onSelectSeat={s => setSelectedSeat(s.id === selectedSeat?.id ? null : s)} />
+            <SeatGrid 
+              coach={c} 
+              selectedSeat={selectedSeat} 
+              onSelectSeat={s => setSelectedSeat(s.id === selectedSeat?.id ? null : s)} 
+              engine={engine}
+              selectedOrigin={selectedOrigin}
+              selectedDest={selectedDest}
+            />
           </TabsContent>
         ))}
       </Tabs>
 
       <div className="flex gap-4 text-sm flex-wrap">
-        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-emerald-500/20 border-emerald-500/50" /> Selectable (CNF)</span>
-        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-destructive/20 border-destructive/50" /> Locked / Taken</span>
-        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-accent text-accent-foreground" /> Selected</span>
+        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-emerald-500/20 border-emerald-500/50" /> Available (CNF)</span>
+        <span className="flex items-center gap-1.5"><span className="h-4 w-4 rounded border bg-destructive/20 border-destructive/50" /> Segment Booked</span>
+        <span className="flex items-center gap-3 text-xs opacity-70 italic ml-auto">* Colors dynamic to selection</span>
       </div>
 
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
@@ -177,8 +250,8 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
         </h3>
         <p className="mb-5 text-sm text-muted-foreground">
           {selectedSeat 
-            ? 'You have selected a Confirmed seat. Enter your username to lock it in.'
-            : 'No seat selected. Enter your username to be auto-assigned a Confirmed Seat, RAC, or Waitlist based on live dynamic capacity limits.'}
+            ? `Booking from ${selectedOrigin} to ${selectedDest}. Confirmed seat selected.`
+            : `Booking from ${selectedOrigin} to ${selectedDest}. Auto-assigned status based on segment capacity.`}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
@@ -187,14 +260,14 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
               placeholder="Roblox Username"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-11"
               maxLength={50}
             />
           </div>
           <Button
             onClick={handleBook}
             disabled={!username.trim() || !settings.bookingOpen || isBooking}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 font-semibold"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 font-bold h-11 px-8"
           >
             {isBooking ? (
               <>Processing...</>
@@ -208,15 +281,35 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
   );
 }
 
-function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selectedSeat: Seat | null; onSelectSeat: (s: Seat) => void }) {
+function SeatGrid({ 
+  coach, 
+  selectedSeat, 
+  onSelectSeat, 
+  engine, 
+  selectedOrigin, 
+  selectedDest 
+}: { 
+  coach: Coach; 
+  selectedSeat: Seat | null; 
+  onSelectSeat: (s: Seat) => void;
+  engine: GameTrainBookingSystem;
+  selectedOrigin: string;
+  selectedDest: string;
+}) {
   const cols = 8;
-  // Feature: Map unavailable seats sequentially to RAC/WL logic like IRCTC 
-  let racCounter = 1;
-  let wlCounter = 1;
-  const RAC_LIMIT = 10; // Shared limit simulation just for visuals
+  const rCheck = engine.isValidRoute(selectedOrigin, selectedDest);
+  
+  // Calculate Segmented Stats
+  const segmentStats = coach.seats.reduce((acc, s) => {
+    const isOccupied = engine.seats.find(es => es.id === s.id)?.bookings.some(b => 
+      GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
+    );
+    if (isOccupied || s.isLocked) acc.lockedOrBooked++;
+    return acc;
+  }, { lockedOrBooked: 0 });
 
-  // Calculate stats for display
-  const totalLocked = coach.seats.filter(s => s.isLocked || s.isBooked).length;
+  const RAC_LIMIT = 10;
+  const totalLocked = segmentStats.lockedOrBooked;
   const currentRAC = Math.min(totalLocked, RAC_LIMIT);
   const currentWL = Math.max(0, totalLocked - RAC_LIMIT);
 
@@ -226,7 +319,10 @@ function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selecte
         <div className="grid gap-2 min-w-[500px]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(50px, 1fr))` }}>
           {coach.seats.map(seat => {
             const isSelected = selectedSeat?.id === seat.id;
-            const isUnavailable = seat.isBooked || seat.isLocked;
+            const isOccupied = engine.seats.find(es => es.id === seat.id)?.bookings.some(b => 
+               GameTrainBookingSystem.segmentsOverlap(rCheck.startIndex, rCheck.endIndex, b.startIndex, b.endIndex)
+            );
+            const isUnavailable = isOccupied || seat.isLocked;
             
             let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20'; // Green
             if (isUnavailable) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed'; // Red
@@ -235,23 +331,13 @@ function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selecte
             let displayStatus = String(seat.number);
             let displaySub = seat.position.substring(0, 1) + (seat.position.includes(' ') ? seat.position.split(' ')[1].substring(0, 1) : '');
 
-            if (isUnavailable) {
-               if (racCounter <= RAC_LIMIT) {
-                   displayStatus = `RAC${racCounter}`;
-                   racCounter++;
-               } else {
-                   displayStatus = `WL${wlCounter}`;
-                   wlCounter++;
-               }
-            }
-
             return (
               <button
                 key={seat.id}
-                className={`flex flex-col h-14 w-full items-center justify-center rounded-xl border transition-all duration-200 ${cls} ${isUnavailable ? 'opacity-60' : ''}`}
+                className={`flex flex-col h-14 w-full items-center justify-center rounded-xl border transition-all duration-200 ${cls} ${isUnavailable ? 'opacity-40' : ''}`}
                 onClick={() => !isUnavailable && onSelectSeat(seat)}
                 disabled={isUnavailable}
-                title={`${seat.number} - ${seat.position}${seat.isBooked ? ` (Booked)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
+                title={`${seat.number} - ${seat.position}${isOccupied ? ` (Booked for this segment)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
               >
                 <span className="text-xs font-mono font-black">{displayStatus}</span>
                 {!isUnavailable && <span className="text-[8px] uppercase font-bold opacity-60 tracking-widest">{displaySub}</span>}
@@ -261,20 +347,19 @@ function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selecte
         </div>
       </div>
 
-      {/* Queue Status Display - Below Seats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="flex items-center justify-between p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 transition-all">
+        <div className="flex items-center justify-between p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5">
           <div className="flex flex-col text-left">
-            <span className="text-[10px] uppercase font-black text-amber-600 tracking-widest leading-none">Status</span>
+            <span className="text-[10px] uppercase font-black text-amber-600 tracking-widest leading-none">Segment Status</span>
             <span className="text-sm font-black text-amber-700">RAC Queue</span>
           </div>
           <p className="font-mono text-2xl font-black text-amber-600">
             {currentRAC < RAC_LIMIT ? `AVBL ${RAC_LIMIT - currentRAC}` : `RAC ${currentRAC}`}
           </p>
         </div>
-        <div className="flex items-center justify-between p-4 rounded-2xl border border-destructive/20 bg-destructive/5 transition-all">
+        <div className="flex items-center justify-between p-4 rounded-2xl border border-destructive/20 bg-destructive/5">
           <div className="flex flex-col text-left">
-            <span className="text-[10px] uppercase font-black text-destructive tracking-widest leading-none">Status</span>
+            <span className="text-[10px] uppercase font-black text-destructive tracking-widest leading-none">Segment Status</span>
             <span className="text-sm font-black text-destructive-foreground/70">Waitlist</span>
           </div>
           <p className="font-mono text-2xl font-black text-destructive">

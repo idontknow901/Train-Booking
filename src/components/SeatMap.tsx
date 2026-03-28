@@ -215,39 +215,72 @@ function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selecte
   let wlCounter = 1;
   const RAC_LIMIT = 10; // Shared limit simulation just for visuals
 
+  // Calculate stats for display
+  const totalLocked = coach.seats.filter(s => s.isLocked || s.isBooked).length;
+  const currentRAC = Math.min(totalLocked, RAC_LIMIT);
+  const currentWL = Math.max(0, totalLocked - RAC_LIMIT);
+
   return (
-    <div className="rounded-lg border border-border bg-card p-4 overflow-x-auto">
-      <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(40px, 1fr))` }}>
-        {coach.seats.map(seat => {
-          const isSelected = selectedSeat?.id === seat.id;
-          const isUnavailable = seat.isBooked || seat.isLocked;
-          let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20'; // Green
-          if (isUnavailable) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed'; // Red
-          if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-105'; // Blue
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm overflow-x-auto overflow-y-hidden">
+        <div className="grid gap-2 min-w-[500px]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(50px, 1fr))` }}>
+          {coach.seats.map(seat => {
+            const isSelected = selectedSeat?.id === seat.id;
+            const isUnavailable = seat.isBooked || seat.isLocked;
+            
+            let cls = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20'; // Green
+            if (isUnavailable) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed'; // Red
+            if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-110 z-10'; // Blue
 
-          let displayStatus = String(seat.number);
-          if (isUnavailable) {
-             if (racCounter <= RAC_LIMIT) {
-                 displayStatus = `RAC${racCounter}`;
-                 racCounter++;
-             } else {
-                 displayStatus = `WL${wlCounter}`;
-                 wlCounter++;
-             }
-          }
+            let displayStatus = String(seat.number);
+            let displaySub = seat.position.substring(0, 1) + (seat.position.includes(' ') ? seat.position.split(' ')[1].substring(0, 1) : '');
 
-          return (
-            <button
-              key={seat.id}
-              className={`flex h-10 w-full items-center justify-center rounded border text-[10px] font-mono font-bold transition-all ${cls} ${isUnavailable ? 'tracking-tighter' : ''}`}
-              onClick={() => !isUnavailable && onSelectSeat(seat)}
-              disabled={isUnavailable}
-              title={`Seat ${seat.number} - ${seat.position}${seat.isBooked ? ` (Booked)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
-            >
-              {displayStatus}
-            </button>
-          );
-        })}
+            if (isUnavailable) {
+               if (racCounter <= RAC_LIMIT) {
+                   displayStatus = `RAC${racCounter}`;
+                   racCounter++;
+               } else {
+                   displayStatus = `WL${wlCounter}`;
+                   wlCounter++;
+               }
+            }
+
+            return (
+              <button
+                key={seat.id}
+                className={`flex flex-col h-14 w-full items-center justify-center rounded-xl border transition-all duration-200 ${cls} ${isUnavailable ? 'opacity-60' : ''}`}
+                onClick={() => !isUnavailable && onSelectSeat(seat)}
+                disabled={isUnavailable}
+                title={`${seat.number} - ${seat.position}${seat.isBooked ? ` (Booked)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
+              >
+                <span className="text-xs font-mono font-black">{displayStatus}</span>
+                {!isUnavailable && <span className="text-[8px] uppercase font-bold opacity-60 tracking-widest">{displaySub}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Queue Status Display - Below Seats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex items-center justify-between p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 transition-all">
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] uppercase font-black text-amber-600 tracking-widest leading-none">Status</span>
+            <span className="text-sm font-black text-amber-700">RAC Queue</span>
+          </div>
+          <p className="font-mono text-2xl font-black text-amber-600">
+            {currentRAC < RAC_LIMIT ? `AVBL ${RAC_LIMIT - currentRAC}` : `RAC ${currentRAC}`}
+          </p>
+        </div>
+        <div className="flex items-center justify-between p-4 rounded-2xl border border-destructive/20 bg-destructive/5 transition-all">
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] uppercase font-black text-destructive tracking-widest leading-none">Status</span>
+            <span className="text-sm font-black text-destructive-foreground/70">Waitlist</span>
+          </div>
+          <p className="font-mono text-2xl font-black text-destructive">
+             {currentWL > 0 ? `WL ${currentWL}` : 'AVAILABLE'}
+          </p>
+        </div>
       </div>
     </div>
   );

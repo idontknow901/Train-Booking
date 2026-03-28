@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import AdminLogin from '@/components/AdminLogin';
-import { Train, Coach, Station, Booking } from '@/types/train';
+import { Train, Coach, Station, Booking, Seat } from '@/types/train';
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -333,7 +333,6 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
       coaches: coaches.map((c, i) => {
         // Feature 1: Randomized Visual Scarcity 
         // We pick exactly maxConfirmed number of indices to stay unlocked. The rest is locked (Red).
-        const seatIndices = Array.from({ length: c.seats }, (_, j) => j);
         const unlockedIndices = new Set();
         
         // Randomly pick unique indices to unlock
@@ -347,13 +346,37 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
           type: c.type,
           totalSeats: c.seats,
           maxConfirmed: c.maxConfirmed,
-          seats: Array.from({ length: c.seats }, (_, j) => ({
-            id: `seat-${j + 1}`,
-            number: j + 1,
-            position: (['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper'] as const)[j % 5],
-            isBooked: false,
-            isLocked: !unlockedIndices.has(j) // Lock it if it wasn't randomly selected
-          })),
+          seats: Array.from({ length: c.seats }, (_, j) => {
+            let position: Seat['position'] = 'Lower';
+            const seatNum = j + 1;
+            
+            if (c.type === 'SL' || c.type === '3A') {
+              const mod = seatNum % 8;
+              if (mod === 1 || mod === 4) position = 'Lower';
+              else if (mod === 2 || mod === 5) position = 'Middle';
+              else if (mod === 3 || mod === 6) position = 'Upper';
+              else if (mod === 7) position = 'Side Lower';
+              else position = 'Side Upper'; // mod === 0
+            } else if (c.type === '2A') {
+              const mod = seatNum % 6;
+              if (mod === 1 || mod === 3) position = 'Lower';
+              else if (mod === 2 || mod === 4) position = 'Upper';
+              else if (mod === 5) position = 'Side Lower';
+              else position = 'Side Upper'; // mod === 0
+            } else if (c.type === '1A') {
+              const mod = seatNum % 4;
+              if (mod === 1 || mod === 3) position = 'Lower';
+              else position = 'Upper'; // mod 2, 0
+            }
+
+            return {
+              id: `seat-${seatNum}`,
+              number: seatNum,
+              position,
+              isBooked: false,
+              isLocked: !unlockedIndices.has(j)
+            };
+          }),
         };
       }),
     };

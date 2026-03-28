@@ -3,8 +3,8 @@ import { Train, Coach, Seat } from '@/types/train';
 import { useTrainContext } from '@/context/TrainContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Ticket, User, MapPin } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import BookingConfirmation from './BookingConfirmation';
 import { Booking } from '@/types/train';
@@ -21,6 +21,8 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
   const { bookSeat, settings, trains } = useTrainContext();
   const train = trains.find(t => t.id === initialTrain.id) || initialTrain;
 
+  const [selectedOrigin, setSelectedOrigin] = useState(origin);
+  const [selectedDest, setSelectedDest] = useState(destination);
   const [selectedCoach, setSelectedCoach] = useState(train.coaches[0].id);
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
   const [username, setUsername] = useState('');
@@ -42,15 +44,14 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
     setIsBooking(true);
 
     try {
-      // Pass null for seatId if they didn't explicitly select a seat to default to RAC/WL queue behaviors
       const booking = await bookSeat(
           train.id, 
           selectedSeat ? selectedCoach : null, 
           selectedSeat ? selectedSeat.id : null, 
           username.trim(), 
           journeyDate, 
-          origin, 
-          destination
+          selectedOrigin, 
+          selectedDest
       );
       if (booking) {
         toast.success(`Ticket booked! PNR: ${booking.pnr}`);
@@ -75,13 +76,36 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="mr-1 h-4 w-4" /> Back
-        </Button>
-        <div>
-          <h2 className="text-xl font-bold text-foreground">{train.name} <span className="font-mono text-accent">#{train.number}</span></h2>
-          <p className="text-sm text-muted-foreground">{origin} → {destination} | {journeyDate}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="mr-1 h-4 w-4" /> Back
+          </Button>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">{train.name} <span className="font-mono text-accent">#{train.number}</span></h2>
+            <p className="text-sm text-muted-foreground">{journeyDate}</p>
+          </div>
+        </div>
+
+        {/* Dynamic Origin / Dest Selectors */}
+        <div className="flex items-center gap-2 bg-muted/30 p-2 rounded-xl border border-border">
+           <Select value={selectedOrigin} onValueChange={(v) => { setSelectedOrigin(v); setSelectedSeat(null); }}>
+               <SelectTrigger className="h-8 text-xs font-bold bg-background shadow-sm w-32"><SelectValue /></SelectTrigger>
+               <SelectContent>
+                   {train.route.map((s, idx) => (
+                       <SelectItem key={s.code} value={s.code} disabled={idx >= train.route.findIndex(x => x.code === selectedDest)}>{s.name} ({s.code})</SelectItem>
+                   ))}
+               </SelectContent>
+           </Select>
+           <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+           <Select value={selectedDest} onValueChange={(v) => { setSelectedDest(v); setSelectedSeat(null); }}>
+               <SelectTrigger className="h-8 text-xs font-bold bg-background shadow-sm w-32"><SelectValue /></SelectTrigger>
+               <SelectContent>
+                   {train.route.map((s, idx) => (
+                       <SelectItem key={s.code} value={s.code} disabled={idx <= train.route.findIndex(x => x.code === selectedOrigin)}>{s.name} ({s.code})</SelectItem>
+                   ))}
+               </SelectContent>
+           </Select>
         </div>
       </div>
 
@@ -98,10 +122,10 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
         </h3>
         <div className="relative flex items-center justify-between before:absolute before:left-0 before:right-0 before:h-0.5 before:bg-muted before:top-1/2 before:-translate-y-1/2 before:z-0">
            {train.route.map((stop, idx) => {
-              const isOrigin = stop.code === origin;
-              const isDest = stop.code === destination;
-              const originIdx = train.route.findIndex(s => s.code === origin);
-              const destIdx = train.route.findIndex(s => s.code === destination);
+              const isOrigin = stop.code === selectedOrigin;
+              const isDest = stop.code === selectedDest;
+              const originIdx = train.route.findIndex(s => s.code === selectedOrigin);
+              const destIdx = train.route.findIndex(s => s.code === selectedDest);
               
               let dotColor = 'bg-muted border-border';
               if (idx >= originIdx && idx <= destIdx) dotColor = 'bg-accent border-accent';
@@ -185,6 +209,11 @@ export default function SeatMap({ train: initialTrain, journeyDate, origin, dest
 
 function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selectedSeat: Seat | null; onSelectSeat: (s: Seat) => void }) {
   const cols = 8;
+  // Feature: Map unavailable seats sequentially to RAC/WL logic like IRCTC 
+  let racCounter = 1;
+  let wlCounter = 1;
+  const RAC_LIMIT = 10; // Shared limit simulation just for visuals
+
   return (
     <div className="rounded-lg border border-border bg-card p-4 overflow-x-auto">
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(40px, 1fr))` }}>
@@ -195,15 +224,26 @@ function SeatGrid({ coach, selectedSeat, onSelectSeat }: { coach: Coach; selecte
           if (isUnavailable) cls = 'bg-destructive/10 border-destructive/20 text-destructive/50 cursor-not-allowed'; // Red
           if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-sm scale-105'; // Blue
 
+          let displayStatus = String(seat.number);
+          if (isUnavailable) {
+             if (racCounter <= RAC_LIMIT) {
+                 displayStatus = `RAC${racCounter}`;
+                 racCounter++;
+             } else {
+                 displayStatus = `WL${wlCounter}`;
+                 wlCounter++;
+             }
+          }
+
           return (
             <button
               key={seat.id}
-              className={`flex h-10 w-full items-center justify-center rounded border text-xs font-mono font-semibold transition-all ${cls}`}
+              className={`flex h-10 w-full items-center justify-center rounded border text-[10px] font-mono font-bold transition-all ${cls} ${isUnavailable ? 'tracking-tighter' : ''}`}
               onClick={() => !isUnavailable && onSelectSeat(seat)}
               disabled={isUnavailable}
-              title={`Seat ${seat.number} - ${seat.position}${seat.isBooked ? ` (Booked)` : seat.isLocked ? ` (Locked by Route)` : ''}`}
+              title={`Seat ${seat.number} - ${seat.position}${seat.isBooked ? ` (Booked)` : seat.isLocked ? ` (Locked by Capacity)` : ''}`}
             >
-              {seat.number}
+              {displayStatus}
             </button>
           );
         })}

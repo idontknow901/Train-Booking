@@ -201,7 +201,9 @@ function PassengerList({ bookings, onClearAll }: { bookings: Booking[], onClearA
                   <td className="px-6 py-4 font-mono font-bold text-accent">{b.pnr}</td>
                   <td className="px-6 py-4 font-bold text-foreground">{b.username}</td>
                   <td className="px-6 py-4 text-foreground">{b.trainName} <span className="text-[10px] opacity-50 ml-1">#{b.trainNumber}</span></td>
-                  <td className="px-6 py-4 font-mono text-foreground text-xs">{b.coachId.split('-')[0]} / #{b.seatNumber}</td>
+                  <td className="px-6 py-4 font-mono text-foreground text-xs">
+                    {b.coachId.split('-')[1] || b.coachId} / {b.seats.map(s => `#${s.number}`).join(', ')}
+                  </td>
                   <td className="px-6 py-4 text-foreground font-medium">{b.origin} → {b.destination}</td>
                   <td className="px-6 py-4 text-muted-foreground text-xs">{b.journeyDate}</td>
                 </tr>
@@ -376,9 +378,9 @@ function AddTrainForm({ onAdd, stations }: { onAdd: (train: Train) => Promise<vo
 
       await onAdd(train);
       toast.success(`Train "${train.name}" added!`);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Failed to add train:', e);
-      toast.error(e.message || 'Failed to add train.');
+      toast.error(e instanceof Error ? e.message : 'Failed to add train.');
     } finally {
       setIsSubmitting(false);
     }
@@ -527,9 +529,9 @@ function StationManager({ stations, onAdd, onRemove, onClearAll }: { stations: S
 
       await onAdd(station);
       toast.success(`Station "${station.name}" added!`);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Failed to add station:', e);
-      toast.error(e.message || 'Failed to add station.');
+      toast.error(e instanceof Error ? e.message : 'Failed to add station.');
     } finally {
       setIsSubmitting(false);
     }

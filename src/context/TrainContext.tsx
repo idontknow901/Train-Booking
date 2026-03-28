@@ -2,19 +2,16 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { db } from '@/lib/firebase';
 import { 
   collection, 
-  addDoc, 
   updateDoc, 
   deleteDoc, 
   doc, 
   onSnapshot, 
   getDoc, 
   getDocs,
-  query,
-  where,
   setDoc,
   writeBatch
 } from 'firebase/firestore';
-import { Train, Station, Booking, Seat, GlobalSettings, Coach } from '@/types/train';
+import { Train, Station, Booking, Seat, GlobalSettings } from '@/types/train';
 import { toast } from 'sonner';
 
 interface TrainContextType {
@@ -40,15 +37,18 @@ interface TrainContextType {
   cancelBooking: (pnr: string) => Promise<void>;
   resetAllSeats: () => Promise<void>;
   clearAllTrains: () => Promise<void>;
+  clearAllStations: () => Promise<void>;
+  clearAllBookings: () => Promise<void>;
   updateSettings: (settings: Partial<GlobalSettings>) => Promise<void>;
+  toggleBooking: () => Promise<void>;
 }
 
 const TrainContext = createContext<TrainContextType | undefined>(undefined);
 
-const withTimeout = (promise: Promise<any>, actionName: string, timeoutMs: number = 8000) => {
+const withTimeout = <T,>(promise: Promise<T>, actionName: string, timeoutMs: number = 8000): Promise<T> => {
   return Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`${actionName} timed out after ${timeoutMs}ms`)), timeoutMs))
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${actionName} timed out after ${timeoutMs}ms`)), timeoutMs))
   ]);
 };
 
@@ -126,7 +126,6 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         const trainData = trainSnap.data() as Train;
         const pnr = Math.random().toString().substring(2, 12);
 
-        // Update the physical seats in the train document
         const updatedCoaches = trainData.coaches.map(coach => {
            if (coach.id === coachId) {
               const updatedSeats = coach.seats.map(seat => {
@@ -170,7 +169,6 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
         await withTimeout(updateDoc(trainRef, { coaches: updatedCoaches }), 'Updating train seats');
         await withTimeout(setDoc(doc(db, 'bookings', pnr), newBooking), 'Saving booking');
 
-        // Send Discord Webhook notification
         try {
           const { sendBookingWebhook } = await import('@/lib/discord');
           sendBookingWebhook(newBooking, trainData);
@@ -180,10 +178,10 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
 
         return newBooking;
       }
-    } catch (e: any) {
-      console.error('bookSeat: ERROR', e);
-      toast.error(e.message || 'Booking failed');
-      throw e;
+    } catch (error) {
+      console.error(error);
+      toast.error('Operation failed');
+      throw error;
     }
 
     return null;
@@ -215,8 +213,8 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       }
 
       await withTimeout(deleteDoc(doc(db, 'bookings', pnr)), 'Cancelling booking');
-    } catch (e) {
-      console.error('cancelBooking: ERROR', e);
+    } catch (error) {
+      toast.error('Failed to book seats');
     }
   }, [bookings]);
 
@@ -257,9 +255,27 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     await batch.commit();
   }, []);
 
+  const clearAllStations = useCallback(async () => {
+    const querySnapshot = await getDocs(collection(db, 'stations'));
+    const batch = writeBatch(db);
+    querySnapshot.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }, []);
+
+  const clearAllBookings = useCallback(async () => {
+    const querySnapshot = await getDocs(collection(db, 'bookings'));
+    const batch = writeBatch(db);
+    querySnapshot.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }, []);
+
   const updateSettings = useCallback(async (newSettings: Partial<GlobalSettings>) => {
     await updateDoc(doc(db, 'settings', 'global'), newSettings);
   }, []);
+
+  const toggleBooking = useCallback(async () => {
+    await updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen });
+  }, [settings.bookingOpen]);
 
   return (
     <TrainContext.Provider value={{
@@ -276,7 +292,10 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
       cancelBooking,
       resetAllSeats,
       clearAllTrains,
+      clearAllStations,
+      clearAllBookings,
       updateSettings,
+      toggleBooking,
     }}>
       {children}
     </TrainContext.Provider>

@@ -95,8 +95,8 @@ export function SeatMap({ train }: SeatMapProps) {
         setSelectedSeats([]);
         setUsername('');
       }
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to book seats');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to book seats');
     } finally {
       setIsBooking(false);
     }

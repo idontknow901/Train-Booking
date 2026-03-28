@@ -57,4 +57,5 @@ export interface Booking {
 
 export interface GlobalSettings {
   bookingOpen: boolean;
+  lastBackup?: string;
 }

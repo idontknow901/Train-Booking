@@ -125,13 +125,13 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
     const booking = bookings.find(b => b.pnr === successPNR);
     return (
       <div className="max-w-xl mx-auto mt-10 space-y-4 animate-in zoom-in-95 duration-500">
-        <div className="bg-background rounded-[2rem] border border-border/50 shadow-2xl overflow-hidden p-8 text-center">
-          <div className="h-20 w-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Check className="h-10 w-10 text-emerald-600" />
+        <div className="bg-background rounded-2xl border border-border/50 shadow-2xl overflow-hidden p-8 text-center">
+          <div className="h-16 w-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check className="h-8 w-8 text-emerald-600" />
           </div>
-          <h2 className="text-3xl font-black text-foreground mb-8">Ticket Confirmed!</h2>
+          <h2 className="text-2xl font-black text-foreground mb-6">Ticket Confirmed!</h2>
           
-          <div className="bg-muted/30 rounded-2xl p-6 border border-border/50 relative mb-8">
+          <div className="bg-muted/30 rounded-xl p-6 border border-border/50 relative mb-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">PNR Number</span>
               <button 
@@ -237,10 +237,10 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
       </div>
 
       <Tabs value={selectedCoach} onValueChange={v => { setSelectedCoach(v); setSelectedSeats([]); }}>
-        <TabsList className="w-full h-12 p-1 bg-muted/20 border border-border rounded-xl">
+        <TabsList className="w-full h-12 p-1 bg-muted/20 border border-border rounded-xl flex overflow-x-auto overflow-y-hidden scrollbar-hide">
           {train.coaches.map(c => (
-            <TabsTrigger key={c.id} value={c.id} className="flex-1 rounded-lg font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              {c.type} Class ({c.seats.length} Seats)
+            <TabsTrigger key={c.id} value={c.id} className="flex-1 min-w-[120px] rounded-lg font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              {c.type} Class
             </TabsTrigger>
           ))}
         </TabsList>
@@ -253,19 +253,19 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
               const isBooked = isSeatBooked(seat);
               const isSelected = selectedSeats.some(s => s.id === seat.id);
               
-              let cls = 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/10';
-              if (isBooked || seat.isLocked) cls = 'bg-muted border-transparent text-muted-foreground/30 cursor-not-allowed';
-              if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-md scale-[1.02] z-10 ring-4 ring-accent/10';
+              let cls = 'bg-emerald-500/5 border-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10';
+              if (isBooked || seat.isLocked) cls = 'bg-red-50 border-red-200 text-red-500 cursor-not-allowed';
+              if (isSelected) cls = 'bg-accent border-accent text-accent-foreground shadow-md scale-[1.02] z-10 ring-2 ring-accent/10';
 
               return (
                 <button
                   key={seat.id}
                   onClick={() => handleSeatClick(seat)}
                   disabled={isBooked || seat.isLocked}
-                  className={`relative group h-24 border-2 rounded-xl flex flex-col items-center justify-center transition-all duration-300 ${cls}`}
+                  className={`relative group h-16 border rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${cls}`}
                 >
-                  <span className="text-3xl font-black mb-1">{seat.number}</span>
-                  <span className="text-[10px] uppercase font-black tracking-widest opacity-60">
+                  <span className="text-xl font-black mb-0.5">{seat.number}</span>
+                  <span className="text-[8px] uppercase font-black tracking-widest opacity-60">
                     {seat.position}
                   </span>
                 </button>
@@ -274,28 +274,28 @@ export function SeatMap({ train, onBack, origin, destination, journeyDate }: Sea
           </div>
         </div>
       ) : (
-        <div className="rounded-[2rem] border-2 border-dashed border-accent/20 bg-accent/5 p-12 text-center">
-            <Ticket className="h-12 w-12 text-accent mx-auto mb-4" />
-            <h3 className="text-2xl font-black">Confirmed Seats Sold Out</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto">This train has reached its physical seat capacity. Booking will be assigned RAC or Waiting List status.</p>
+        <div className="rounded-2xl border-2 border-dashed border-accent/20 bg-accent/5 p-12 text-center">
+            <Ticket className="h-10 w-10 text-accent mx-auto mb-4" />
+            <h3 className="text-xl font-black">Confirmed Seats General Full</h3>
+            <p className="text-sm text-muted-foreground">Please book using the RAC/WL system below.</p>
         </div>
       )}
 
-      <div className="rounded-[2rem] border border-orange-200 bg-orange-50/50 p-8 shadow-sm animate-in slide-in-from-bottom-5 duration-500">
-         <div className="flex items-center gap-3 mb-6">
-            <Ticket className="h-5 w-5 text-orange-400" />
-            <span className="text-xs font-black uppercase tracking-[0.2em] text-orange-400">Current Queue Status</span>
+      <div className="rounded-2xl border border-orange-200 bg-orange-50/50 p-6 shadow-sm animate-in slide-in-from-bottom-5 duration-500">
+         <div className="flex items-center gap-2 mb-4">
+            <Ticket className="h-4 w-4 text-orange-400" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-400">Current Queue Status</span>
          </div>
-         <p className="text-3xl font-black text-foreground">
+         <p className="text-2xl font-black text-foreground">
             {isFull ? (
-              isWL ? `Waitlisted (WL ${trainBookings.length - (train.maxConfirmedSeats || 10) - (train.racLimit || 5) + 1})` : `RAC (RAC ${trainBookings.length - (train.maxConfirmedSeats || 10) + 1})`
+              isWL ? `AVAILABLE - 0 | WL - ${String(trainBookings.length - (train.maxConfirmedSeats || 10) - (train.racLimit || 5) + 1).padStart(2, '0')}` : `AVAILABLE - 0 | RAC - ${String(trainBookings.length - (train.maxConfirmedSeats || 10) + 1).padStart(2, '0')}`
             ) : (
-              `Available (${(train.maxConfirmedSeats || 10) - trainBookings.length} Seats Left)`
+              `AVAILABLE - ${String((train.maxConfirmedSeats || 10) - trainBookings.length).padStart(4, '0')} | RAC - 00 | WL - 00`
             )}
          </p>
       </div>
 
-      <div className="rounded-[2rem] border border-orange-200 bg-orange-50/30 p-8 shadow-sm">
+      <div className="rounded-2xl border border-orange-200 bg-orange-50/30 p-6 shadow-sm">
          <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <Ticket className="h-5 w-5 text-orange-400" />

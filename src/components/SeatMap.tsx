@@ -335,6 +335,7 @@ function SeatGrid({
 
   const currentRAC = classBookings.filter(b => b.status === 'RAC').length;
   const currentWL = classBookings.filter(b => b.status === 'WL').length;
+  const availability = engine.getAvailabilityForSegment(rCheck.startIndex, rCheck.endIndex);
 
   return (
     <div className="space-y-4">
@@ -374,25 +375,47 @@ function SeatGrid({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex items-center justify-between p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5">
-          <div className="flex flex-col text-left">
-            <span className="text-[10px] uppercase font-black text-amber-600 tracking-widest leading-none">Segment Status</span>
-            <span className="text-sm font-black text-amber-700">RAC Queue</span>
-          </div>
-          <p className="font-mono text-2xl font-bold text-amber-600">
-            {currentRAC > 0 ? `RAC ${currentRAC}` : `RAC AVBL 10`}
-          </p>
-        </div>
-        <div className="flex items-center justify-between p-4 rounded-2xl border border-destructive/20 bg-destructive/5">
-          <div className="flex flex-col text-left">
-            <span className="text-[10px] uppercase font-black text-destructive tracking-widest leading-none">Segment Status</span>
-            <span className="text-sm font-black text-destructive">Waitlist</span>
-          </div>
-          <p className="font-mono text-2xl font-bold text-destructive">
-             {currentWL > 0 ? `WL ${currentWL}` : 'WL AVAILABLE'}
-          </p>
-        </div>
+      <div className="flex gap-4">
+        {availability.status === 'AVAILABLE' ? (
+            <div className={`p-5 rounded-[2rem] flex-1 border-2 border-emerald-500/30 bg-emerald-50/50 shadow-sm transition-all animate-in zoom-in-95 backdrop-blur-sm`}>
+               <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600/70 mb-1">Coach Inventory</span>
+                    <span className="text-2xl font-black text-emerald-700 tracking-tighter leading-none italic">AVAILABLE</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-4xl font-black text-emerald-800 tracking-tighter leading-none">{availability.count}</span>
+                    <span className="text-[10px] font-bold text-emerald-600/50 uppercase tracking-widest mt-1">Confirmed Seats</span>
+                  </div>
+               </div>
+            </div>
+        ) : availability.status === 'RAC' ? (
+            <div className={`p-5 rounded-[2rem] flex-1 border-2 border-amber-500/30 bg-amber-50/50 shadow-sm transition-all animate-in zoom-in-95 backdrop-blur-sm`}>
+               <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600/70 mb-1">Reservation Status</span>
+                    <span className="text-2xl font-black text-amber-700 tracking-tighter leading-none italic">RAC</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-4xl font-black text-amber-800 tracking-tighter leading-none">{availability.count}</span>
+                    <span className="text-[10px] font-bold text-amber-600/50 uppercase tracking-widest mt-1">Available slots</span>
+                  </div>
+               </div>
+            </div>
+        ) : (
+            <div className={`p-5 rounded-[2rem] flex-1 border-2 border-destructive/30 bg-destructive/50 shadow-sm transition-all animate-in zoom-in-95 backdrop-blur-sm`}>
+               <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-destructive/70 mb-1">Train Status</span>
+                    <span className="text-2xl font-black text-destructive tracking-tighter leading-none italic">WAITLIST</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-4xl font-black text-destructive tracking-tighter leading-none">{availability.count}</span>
+                    <span className="text-[10px] font-bold text-destructive/50 uppercase tracking-widest mt-1">In Queue</span>
+                  </div>
+               </div>
+            </div>
+        )}
       </div>
     </div>
   );

@@ -21,24 +21,33 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <div className="min-h-screen bg-background">
-            {/* Global Navigation */}
-            <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+            {/* Global Navigation - Professional IRCTC Blue */}
+            <nav className="border-b bg-[#213d77] shadow-lg sticky top-0 z-50">
               <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                <Link to="/" className="flex items-center gap-2 font-black text-xl hover:opacity-80 transition-opacity">
-                  <span className="bg-primary text-primary-foreground p-1 rounded-lg">
-                    <Train className="h-5 w-5" />
-                  </span>
-                  EPIC RAIL
+                <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+                  <div className="bg-white p-1.5 rounded-xl shadow-inner">
+                    <Train className="h-6 w-6 text-[#213d77]" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-white font-black text-xl tracking-tighter leading-none">EPIC RAIL</span>
+                    <span className="text-[10px] font-bold text-white/60 tracking-[0.2em] -mt-0.5">EST. 2026</span>
+                  </div>
                 </Link>
                 
-                <div className="flex items-center gap-4">
-                  <Link to="/bookings">
-                    <Button variant="ghost" className="font-bold flex items-center gap-2">
-                      <Ticket className="h-4 w-4" /> My Bookings
+                <div className="flex items-center gap-2">
+                  <Link to="/">
+                    <Button variant="ghost" className="text-white font-black text-xs uppercase tracking-widest hover:bg-white/10 px-4 py-2 h-10">
+                      Home
                     </Button>
                   </Link>
+                  <Link to="/bookings">
+                    <Button variant="ghost" className="text-white font-black text-xs uppercase tracking-widest hover:bg-white/10 px-4 py-2 h-10 flex items-center gap-2">
+                      <Ticket className="h-4 w-4" /> Passenger Portal
+                    </Button>
+                  </Link>
+                  <div className="h-6 w-px bg-white/20 mx-2" />
                   <Link to="/admin">
-                    <Button variant="ghost" className="font-bold flex items-center gap-2 text-muted-foreground hover:text-foreground">
+                    <Button variant="ghost" className="text-white/70 font-black text-xs uppercase tracking-widest hover:bg-white/10 px-4 py-2 h-10 flex items-center gap-2">
                       <Settings className="h-4 w-4" /> Admin
                     </Button>
                   </Link>

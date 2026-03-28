@@ -264,4 +264,36 @@ export class GameTrainBookingSystem {
   getManifest(): PlayerBooking[] {
       return [...this.bookings];
   }
+
+  /**
+   * Calculates the current availability status for a specific journey segment.
+   */
+  getAvailabilityForSegment(startIndex: number, endIndex: number): { status: 'AVAILABLE' | 'RAC' | 'WL'; count: number } {
+    // 1. Check physical availability
+    let availablePhysicalCount = 0;
+    const manageableSeats = this.seats.slice(0, this.softCap);
+    for (const seat of manageableSeats) {
+        const isOccupied = seat.bookings.some(booking => 
+            GameTrainBookingSystem.segmentsOverlap(startIndex, endIndex, booking.startIndex, booking.endIndex)
+        );
+        if (!isOccupied) availablePhysicalCount++;
+    }
+
+    if (availablePhysicalCount > 0) {
+        return { status: 'AVAILABLE', count: availablePhysicalCount };
+    }
+
+    // 2. Check RAC availability
+    const racAllowedSlots = this.racCap - this.softCap;
+    const currentRacCount = this.bookings.filter(b => b.status === 'RAC').length;
+    const racAvailable = racAllowedSlots - currentRacCount;
+
+    if (racAvailable > 0) {
+        return { status: 'RAC', count: racAvailable };
+    }
+
+    // 3. Fallback to WL
+    const currentWlCount = this.bookings.filter(b => b.status === 'WL').length;
+    return { status: 'WL', count: currentWlCount + 1 };
+  }
 }

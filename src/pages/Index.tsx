@@ -43,27 +43,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background selection:bg-accent/30">
-      {/* Header */}
-      <header className="border-b border-border bg-primary/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-xl font-black text-primary-foreground tracking-tight leading-none">Epic Rails Of India</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/50 mt-1">Train Booking</p>
-            </div>
-          </div>
-          <Link
-            to="/admin"
-            className="group flex items-center gap-2 rounded-xl border border-primary-foreground/10 bg-primary-foreground/5 px-4 py-2.5 text-sm font-bold text-primary-foreground/90 hover:bg-accent hover:text-accent-foreground hover:border-accent transition-all active:scale-95 shadow-sm"
-          >
-            <Shield className="h-4 w-4 group-hover:rotate-12 transition-transform" />
-            <span>Admin</span>
-          </Link>
-        </div>
-      </header>
-
       {/* Main Content Area */}
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6 font-medium">
         {view === 'search' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="mb-6 text-center max-w-2xl mx-auto">

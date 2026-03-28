@@ -255,3 +255,5 @@ export function SeatMap({ train }: SeatMapProps) {
     </div>
   );
 }
+
+export default SeatMap;

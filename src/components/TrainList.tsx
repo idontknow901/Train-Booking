@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 interface TrainListProps {
   trains: Train[];
   onSelectTrain: (train: Train) => void;
+  searchOrigin?: string;
+  searchDestination?: string;
 }
 
-export default function TrainList({ trains, onSelectTrain }: TrainListProps) {
+export default function TrainList({ trains, onSelectTrain, searchOrigin, searchDestination }: TrainListProps) {
   if (trains.length === 0) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 rounded-xl border border-border bg-card p-8 text-center">
@@ -41,9 +43,19 @@ export default function TrainList({ trains, onSelectTrain }: TrainListProps) {
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
-                    <span>{train.route[0].name}</span>
+                    <span className="font-bold text-foreground">
+                      {searchOrigin 
+                        ? (train.route.find(s => s.code === searchOrigin)?.name || train.route[0].name)
+                        : train.route[0].name
+                      }
+                    </span>
                     <ArrowRight className="h-3 w-3" />
-                    <span>{train.route[train.route.length - 1].name}</span>
+                    <span className="font-bold text-foreground">
+                      {searchDestination
+                        ? (train.route.find(s => s.code === searchDestination)?.name || train.route[train.route.length - 1].name)
+                        : train.route[train.route.length - 1].name
+                      }
+                    </span>
                   </div>
                   {train.availableDate && (
                     <div className="flex items-center gap-1 border-l border-border pl-4">

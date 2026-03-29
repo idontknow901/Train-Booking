@@ -296,12 +296,17 @@ export function TrainProvider({ children }: { children: React.ReactNode }) {
     await updateDoc(doc(db, 'settings', 'global'), { bookingOpen: !settings.bookingOpen });
   }, [settings.bookingOpen]);
 
-  const getTrainsByRoute = useCallback((origin: string, destination: string, _date: string) => {
+  const getTrainsByRoute = useCallback((origin: string, destination: string, date: string) => {
     return trains.filter(train => {
       const stops = train.route.map(r => r.code);
       const originIdx = stops.indexOf(origin);
       const destIdx = stops.indexOf(destination);
-      return originIdx !== -1 && destIdx !== -1 && originIdx < destIdx;
+      const routeMatched = originIdx !== -1 && destIdx !== -1 && originIdx < destIdx;
+      
+      // Filter by date: if train has an availableDate, it must match exactly
+      const dateMatched = !train.availableDate || train.availableDate === date;
+      
+      return routeMatched && dateMatched;
     });
   }, [trains]);
 

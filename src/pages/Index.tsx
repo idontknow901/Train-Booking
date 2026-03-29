@@ -82,7 +82,12 @@ const Index = () => {
                       <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Available Routes</h3>
                       <div className="h-px flex-1 bg-border" />
                     </div>
-                    <TrainList trains={results} onSelectTrain={handleSelectTrain} />
+                    <TrainList 
+                      trains={results} 
+                      onSelectTrain={handleSelectTrain} 
+                      searchOrigin={searchParams.origin} 
+                      searchDestination={searchParams.destination} 
+                    />
                   </div>
                 )}
               </div>
